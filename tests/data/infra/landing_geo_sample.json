@@ -1,0 +1,91 @@
+{
+ "type": "FeatureCollection",
+ "name": "landing_points",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "alpha-town-ireland",
+    "name": "Alpha Town, Ireland",
+    "is_tbd": false
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -9.0,
+     52.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "beta-bay-france",
+    "name": "Beta Bay, France"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -4.0,
+     48.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "gamma-port-congo-dem-rep-",
+    "name": "Gamma Port, Congo, Dem. Rep."
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     12.2,
+     -6.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "delta-cove-ireland",
+    "name": "Delta Cove, Ireland"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -8.5,
+     51.8
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "orphan-point-iceland",
+    "name": "Orphan Point, Iceland"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -21.9,
+     64.1
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "alpha-town-ireland",
+    "name": "Duplicate"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -9.0,
+     52.0
+    ]
+   }
+  }
+ ]
+}

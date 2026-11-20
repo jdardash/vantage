@@ -1,0 +1,83 @@
+[
+ {
+  "icao24": "a1b2c3",
+  "callsign": "UAL123",
+  "registration": "N12345",
+  "type": "B738",
+  "lat": 39.9,
+  "lon": -104.7,
+  "alt_m": 10668.0,
+  "gs_kt": 450,
+  "track": 90,
+  "squawk": "1200",
+  "military": false,
+  "seen_at": 1763550000
+ },
+ {
+  "icao24": "a1b2c3",
+  "callsign": "UAL123",
+  "registration": "N12345",
+  "type": "B738",
+  "lat": 40.0,
+  "lon": -104.5,
+  "alt_m": 10700.0,
+  "gs_kt": 450,
+  "track": 90,
+  "squawk": "1200",
+  "military": false,
+  "seen_at": 1763550060
+ },
+ {
+  "icao24": "400abc",
+  "callsign": "BAW12A",
+  "registration": "G-EUPT",
+  "type": "A319",
+  "lat": 51.47,
+  "lon": -0.45,
+  "alt_m": 1200.0,
+  "gs_kt": 180,
+  "track": 270,
+  "squawk": "",
+  "military": false,
+  "seen_at": 1763550000
+ },
+ {
+  "icao24": "ae1234",
+  "callsign": "RCH401",
+  "registration": "05-5140",
+  "type": "C17",
+  "lat": 38.0,
+  "lon": -97.0,
+  "alt_m": 9000.0,
+  "gs_kt": 420,
+  "track": 45,
+  "squawk": "",
+  "military": true,
+  "seen_at": 1763550000
+ },
+ {
+  "icao24": "a99999",
+  "callsign": "",
+  "registration": "",
+  "type": "C172",
+  "lat": 39.5,
+  "lon": -105.1,
+  "alt_m": 2500.0,
+  "gs_kt": 100,
+  "track": 10,
+  "squawk": "1200",
+  "military": false,
+  "seen_at": 1763550000
+ },
+ {
+  "icao24": "c0ffee",
+  "callsign": "UAL1234",
+  "registration": "N77777",
+  "type": "B772",
+  "lat": null,
+  "lon": null,
+  "alt_m": null,
+  "military": false,
+  "seen_at": 1763550000
+ }
+]

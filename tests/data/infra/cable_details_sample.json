@@ -1,0 +1,72 @@
+{
+ "alpha-link": {
+  "id": "alpha-link",
+  "name": "Alpha Link",
+  "length": "3,100 km",
+  "landing_points": [
+   {
+    "id": "alpha-town-ireland",
+    "name": "Alpha Town, Ireland",
+    "country": "Ireland",
+    "is_tbd": null
+   },
+   {
+    "id": "beta-bay-france",
+    "name": "Beta Bay, France",
+    "country": "France",
+    "is_tbd": null
+   }
+  ],
+  "owners": "Example Telecom, Sample Networks",
+  "suppliers": "ASN",
+  "rfs": "2019",
+  "rfs_year": 2019,
+  "is_planned": false,
+  "url": "https://example.com/alpha",
+  "notes": null
+ },
+ "beta-cable": {
+  "id": "beta-cable",
+  "name": "Beta Cable",
+  "length": "40 km",
+  "landing_points": [
+   {
+    "id": "alpha-town-ireland",
+    "name": "Alpha Town, Ireland",
+    "country": "Ireland"
+   },
+   {
+    "id": "delta-cove-ireland",
+    "name": "Delta Cove, Ireland",
+    "country": "Ireland"
+   }
+  ],
+  "owners": "Example Telecom",
+  "suppliers": null,
+  "rfs_year": 2001,
+  "is_planned": false,
+  "url": "javascript:alert(1)"
+ },
+ "gamma-express": {
+  "id": "gamma-express",
+  "name": "Gamma Express",
+  "length": "9,000 km",
+  "landing_points": [
+   {
+    "id": "gamma-port-congo-dem-rep-",
+    "name": "Gamma Port, Congo, Dem. Rep.",
+    "country": "Congo, Dem. Rep."
+   },
+   {
+    "id": "beta-bay-france",
+    "name": "Beta Bay, France",
+    "country": "France"
+   }
+  ],
+  "owners": "Sample Networks",
+  "suppliers": "SubCom",
+  "rfs_year": 2027,
+  "is_planned": true,
+  "url": null
+ }
+}

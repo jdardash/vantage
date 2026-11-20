@@ -575,3 +575,69 @@ position moves. It goes in only on a PASS.
 Next, in order: gap 4's screening volumes once the recall work passes, then
 gap 2 through CDM covariances already ingested (`cdm.py`), then gap 8's reentry
 board on the globe, which needs nothing new from upstream.
+
+## 11. Against ARGOS ATLAS and the other OSINT world maps (2026-11-19)
+
+ARGOS ATLAS (argosatlas.com) is the camera-heavy world map the owner asked to be
+matched. It is closed and freemium, with no public repository, so it is compared
+from its public feature list (research log, 2026-11-19). The six build tracks
+that came out of it (aviation, maritime and sanctions, conflict, country intel,
+infrastructure, cameras) all landed in this branch, each behind its own tests.
+
+| Track | ARGOS ATLAS | Vantage |
+| --- | --- | --- |
+| Cameras | 200,000+ public cameras, 18,838 live video | 193,190, of which 167,883 play in the page |
+| Aviation | ADS-B with a military flag, 7500/7600/7700, OFAC aircraft match, dead reckoning over ocean | adsb.lol `/v2/mil` and squawks under one daily request budget, OFAC and UK lists by tail and Mode S, dead reckoning, GPS interference hexes, a route on the aircraft card |
+| Maritime | AIS, dark-ship flags, OFAC vessels by IMO, strait monitors | AIS through AISStream (free key), dark-ship estimates, OFAC and UK lists by IMO and MMSI, nine chokepoint monitors |
+| Conflict | 16 front lines, GeoConfirmed events, UCDP history | Ukraine drawn from DeepStateMap with all 1,813 maps since 2022-04-03, 13 more theatres as towns held (Wikipedia maps), GeoConfirmed (2,451 events in 90 days), UCDP GED 26.1 plus the Candidate set (434,601 events, 1989 to 2026), ACLED when keyed |
+| Country intel | GDELT risk zones, World Bank card, instability index, WHO outbreaks, cyber C2, outages, convergence | the same set, GDELT taken from the 2.0 event export because the GEO API now answers 404 |
+| Infrastructure | 34,936 plants, 47,927 airports, 1,081 ports, 4,072 data centres, 5,356 dams, cables | 34,741 plants and 195 nuclear, 49,357 airports, 3,803 ports, 5,304 data centres, 77,689 dams, 1,843 radiation stations, cables with 1,929 landing points |
+| VIP jets and yachts | yes | left out on purpose: it tracks people |
+| 3D globe | paid tier | free |
+
+Where ARGOS ATLAS is still ahead: drawn front lines in fifteen more theatres (ours
+are points there) and the count of cameras with live video. Where nothing on its
+list reaches: the whole orbital side (catalog, collision probability checked
+against NASA CARA, sky view, aurora), summits and NASA imagery.
+
+Click-to-identify was checked in a real browser on the same day: every layer was
+switched on, each kind of object the page draws was found by walking Cesium's
+primitives and entities, and one of each was clicked through the page's own
+handler and again with the mouse. Two gaps came out of it and were fixed: the
+aurora oval answered nothing (it now gives the chance under the cursor, and the
+page looks beneath it so an aircraft under the oval still opens its own card),
+and the sky view named only what sat under the crosshair (a click on any star,
+planet, the Moon, the Sun or a satellite overhead now opens a card). A third, the
+conflict layer's checkbox passing an undefined name, left the whole layer dead
+until fixed; a test now holds every toggle to the argument it is given.
+
+A second pass on 2026-11-20 switched on all 19 layers and walked ten places
+(the whole globe, Ukraine, New York from 60 km, the Alps, Rotterdam, Paris,
+Singapore, Everest, the Middle East, Tokyo). It found 59 kinds of object and
+clicked 105 of them; none answered "Unknown". Getting there took five fixes:
+
+- The 150 orbit lines, the sensor spokes, the conjunction markers and
+  uncertainty shells, and the road-traffic dots had no name, so a click said
+  "Tracking: Unknown entity". They are named now, a click on an orbit line
+  selects its satellite, and a test reads every `entities.add` in the page and
+  fails on one without a name.
+- With every layer on, cameras, peaks, infrastructure and ships never drew.
+  `/api/satellite-orbits` ignored its `limit` and propagated the whole catalog
+  for over two minutes, and `/api/flights` waited 72 s on OpenSky with no
+  cache; a browser opens six connections to one host, so those two held the
+  rest back. Orbits now answer in 0.2 s, and flights in 1.7 s, then 0.05 s
+  from a 10 s cache that keeps serving the last good copy for five minutes.
+  The camera layer also threw away its own answer when a repeat refresh
+  arrived while it was loading.
+- The six aircraft models answered 404: the static route had no `.glb` type.
+- The globe hid the Sun and the Moon. Both are now drawn where they are at the
+  simulation time, and a click on either gives the distance, the Moon's phase
+  and the point on Earth it stands over (78% lit and 381,766 km on the day,
+  matching the sky view's own card).
+- In the sky view a satellite a degree away could take a click aimed squarely
+  at a star (Betelgeuse came back as GEESAT 6-03). The tie-break between kinds
+  is now 5% of the click reach per step instead of half a degree.
+
+Ships were not clicked live: the vessel layer needs an AISStream key, and none
+is set on this machine. The vessel and chokepoint cards are covered by
+`tests/test_globe_maritime.py`.

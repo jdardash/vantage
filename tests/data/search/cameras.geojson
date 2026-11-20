@@ -1,0 +1,77 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -104.9903,
+     39.7392
+    ]
+   },
+   "properties": {
+    "id": "d1",
+    "name": "Denver Union Station",
+    "type": "city",
+    "city": "Denver",
+    "country": "US",
+    "feedUrl": "https://cams.example.org/d1.jpg",
+    "playerUrl": "",
+    "streamUrl": "",
+    "feedType": "image",
+    "source": "test",
+    "directEligible": true,
+    "updateRate": 30000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -105.0,
+     39.75
+    ]
+   },
+   "properties": {
+    "id": "d2",
+    "name": "I-25 at Colfax",
+    "type": "traffic",
+    "city": "Denver",
+    "country": "US",
+    "feedUrl": "https://cams.example.org/d2.jpg",
+    "playerUrl": "",
+    "streamUrl": "",
+    "feedType": "image",
+    "source": "test",
+    "directEligible": true,
+    "updateRate": 30000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -121.74,
+     46.78
+    ]
+   },
+   "properties": {
+    "id": "r1",
+    "name": "Paradise Rainier view",
+    "type": "mountain",
+    "city": "Ashford",
+    "country": "US",
+    "feedUrl": "https://cams.example.org/r1.jpg",
+    "playerUrl": "",
+    "streamUrl": "",
+    "feedType": "image",
+    "source": "test",
+    "directEligible": true,
+    "updateRate": 30000
+   }
+  }
+ ]
+}

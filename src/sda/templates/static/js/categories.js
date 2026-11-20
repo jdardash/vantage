@@ -47,7 +47,8 @@
   var SKIP = 255;
 
   // ours: filters share the record's hidden flag. Each owns one bit of
-  // record.hideMask (this filter 1, the object dossier in dossier.js 2) and the
+  // record.hideMask (this filter 1, the object dossier in dossier.js 2, orbit
+  // visuals in orbitviz.js 4) and the
   // record is hidden while any bit is set, so one filter clearing never shows
   // what another still hides. A flag set without a bit is cleared as before.
   var HIDE_BIT = 1;

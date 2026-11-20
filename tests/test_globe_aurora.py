@@ -465,6 +465,58 @@ def test_disable_clears(ran):
                    "requests": 2}
 
 
+scenario("click", r"""
+  route('/api/aurora', OVAL);
+  var k = makeCtx();
+  var cards = [];
+  k.ctx.showInfoCard = function (c) { cards.push(c); };
+  // a camera that puts the cursor over northern Sweden (68 N, 20 E), or off the globe
+  var where = { lat: 68.3, lon: 20.4 };
+  Cesium.Cartographic = { fromCartesian: function (p) {
+    return { latitude: p.lat * Math.PI / 180, longitude: p.lon * Math.PI / 180 }; } };
+  k.ctx.viewer.camera = { pickEllipsoid: function (pos) {
+    return pos && pos.onGlobe ? where : undefined; } };
+  k.ctx.viewer.scene.globe = { ellipsoid: {} };
+  window.SDAAurora.init(k.ctx);
+  window.SDAAurora.setEnabled(true);
+  await settle();
+  var ids = bands(k).map(function (p) { return p.geometryInstances.id; });
+  ids[0].sdaPick({ x: 10, y: 10, onGlobe: true });
+  where = { lat: 50, lon: 0 };
+  ids[0].sdaPick({ x: 10, y: 10, onGlobe: true });
+  ids[1].sdaPick({ x: 10, y: 10 });
+  var S = window.SDAAurora;
+  return {
+    background: ids.map(function (i) { return i.sdaBackground === true; }),
+    cards: cards,
+    chance: [S.chanceAt(OVAL.cells, 68.4, 19.6), S.chanceAt(OVAL.cells, 66, -179.6),
+             S.chanceAt(OVAL.cells, 65.2, -160.5),
+             S.chanceAt(OVAL.cells, 40, 0), S.chanceAt(OVAL.cells, NaN, 0),
+             S.chanceAt(null, 68, 20)]
+  };
+""")
+
+
+def test_clicking_the_oval_says_what_it_is_and_the_chance_there(ran):
+    r = ran["click"]
+    # the oval never hides what lies under it: the page looks below a background first
+    assert r["background"] == [True, True]
+    sweden, south_england, south_off = r["cards"]
+    assert sweden["name"] == "Aurora oval, northern hemisphere"
+    assert sweden["type"] == "aurora forecast"
+    rows = dict(sweden["rows"])
+    assert rows["CHANCE HERE"] == "42%" and rows["POSITION"] == "68.3 N, 20.4 E"
+    assert rows["MAX NORTH"] == "61%" and rows["FORECAST"] == "12:30 UTC"
+    assert rows["SOURCE"] == "NOAA SWPC OVATION"
+    assert dict(south_england["rows"])["CHANCE HERE"] == "under 5%"
+    # a click the ellipsoid cannot place still names the oval and the hemisphere's peak
+    assert south_off["name"] == "Aurora oval, southern hemisphere"
+    off_rows = dict(south_off["rows"])
+    assert "CHANCE HERE" not in off_rows and off_rows["MAX SOUTH"] == "18%"
+    # the strongest cell within a degree, across the antimeridian too; 0 for junk
+    assert r["chance"] == [42, 5, 61, 0, 0, 0]
+
+
 scenario("late_answer", r"""
   route('/api/aurora', OVAL);
   var k = makeCtx();

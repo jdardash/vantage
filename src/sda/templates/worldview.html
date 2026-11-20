@@ -732,6 +732,36 @@
         <span class="count" id="count-peaks">0</span>
       </label>
       <label class="layer-toggle">
+        <input type="checkbox" id="layer-maritime">
+        <span>Maritime</span>
+        <span class="count" id="count-maritime">0</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="layer-intel">
+        <span>Country intel</span>
+        <span class="count" id="count-intel">0</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="layer-aviation">
+        <span>Aviation intel</span>
+        <span class="count" id="count-aviation">0</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="layer-infra">
+        <span>Infrastructure</span>
+        <span class="count" id="count-infra">0</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="layer-orbitviz" checked>
+        <span>Orbit visuals</span>
+        <span class="count" id="count-orbitviz">0</span>
+      </label>
+      <label class="layer-toggle">
+        <input type="checkbox" id="layer-conflict">
+        <span>Conflict</span>
+        <span class="count" id="count-conflict">0</span>
+      </label>
+      <label class="layer-toggle">
         <input type="checkbox" id="layer-sensors">
         <span>Sensor FOV [E]</span>
         <span class="count" id="count-sen">0</span>
@@ -907,6 +937,36 @@
 
   <!-- Agent chat (static/js/agentpanel.js) -->
   <div id="ext-agent"></div>
+  <!-- Maritime: chokepoint monitors, live vessels, dark-ship estimates, sanctioned vessels (maritime.js) -->
+  <div id="ext-maritime"></div>
+  <!-- Country intel: country card, WHO outbreaks, botnet C2, internet outages, convergence (intel.js) -->
+  <div id="ext-intel"></div>
+  <!-- Aviation intel: military aircraft, emergency squawks, estimated tracks, GPS interference (aviation.js) -->
+  <div id="ext-aviation"></div>
+  <!-- Infrastructure: power plants, airports, ports, dams, data centres, radiation stations, submarine cables (infra.js) -->
+  <div id="ext-infra"></div>
+  <!-- Orbit visuals: colour by type, owner, orbit class, age, size, decade or sunlight; watchlist; visible tonight; planes, debris clouds, history, shadow, footprints (orbitviz.js) -->
+  <div id="ext-orbitviz"></div>
+  <!-- View mode: floating 3D / 2D / Columbus switch, remembered (viewmode.js) -->
+  <div id="ext-viewmode"></div>
+  <!-- Camera favourites and the camera wall (camwall.js) -->
+  <div id="ext-camwall"></div>
+  <!-- Universal search: places, satellites, aircraft, cameras, peaks, coordinates (omnisearch.js) -->
+  <div id="ext-omnisearch"></div>
+  <!-- What's here: right-click or long-press card (whatshere.js) -->
+  <div id="ext-whatshere"></div>
+  <!-- 3D models for aircraft, ships, ISS and Hubble when zoomed in, plus the ride-along bar (models.js) -->
+  <div id="ext-models"></div>
+  <!-- Visual presets: detail budget, city-light glow, idle hide (visuals.js) -->
+  <div id="ext-visuals"></div>
+  <!-- Live infrared clouds from GOES, Himawari and the NOAA global mosaic (clouds.js) -->
+  <div id="ext-clouds"></div>
+  <!-- Live hotspot tour: ISS, cyclones, the largest quake, launches, chokepoints (tour.js) -->
+  <div id="ext-tour"></div>
+  <!-- Presentation: settled first frame, SHARE VIEW PNG (presentation.js) -->
+  <div id="ext-presentation"></div>
+  <!-- Armed conflict: front lines, control, verified events, UCDP history (conflict.js) -->
+  <div id="ext-conflict"></div>
 
   <!-- Links -->
   <div class="panel" style="text-align:center;">
@@ -1080,7 +1140,10 @@
     <div class="key-row"><kbd>B</kbd> <span>Toggle the detection glow (bloom)</span></div>
     <div class="key-row"><kbd>G</kbd> <span>Global view</span></div>
     <div class="key-row"><kbd>I</kbd> <span>Cycle basemap (Earth, day / night, night, hi-res)</span></div>
-    <div class="key-row"><kbd>/</kbd> <span>Search location</span></div>
+    <div class="key-row"><kbd>/</kbd> <span>Search places, satellites, aircraft, cameras, peaks</span></div>
+    <div class="key-row"><kbd>`</kbd> <span>Cycle view mode: 3D, 2D, Columbus</span></div>
+    <div class="key-row"><kbd>\</kbd> <span>What's here at the view centre</span></div>
+    <div class="key-row"><kbd>=</kbd> <span>Camera wall of starred cameras</span></div>
     <div class="key-row"><kbd>U</kbd> <span>Find a satellite by name or NORAD id</span></div>
     <div class="key-row"><kbd>Y</kbd> <span>Ask the agent</span></div>
     <div class="key-row"><kbd>?</kbd> <span>This help</span></div>
@@ -1154,6 +1217,21 @@
 <script src="static/js/weather.js"></script>
 <script src="static/js/maptools.js"></script>
 <script src="static/js/peaks.js"></script>
+<script src="static/js/maritime.js"></script>
+<script src="static/js/intel.js"></script>
+<script src="static/js/aviation.js"></script>
+<script src="static/js/infra.js"></script>
+<script src="static/js/orbitviz.js"></script>
+<script src="static/js/viewmode.js"></script>
+<script src="static/js/camwall.js"></script>
+<script src="static/js/omnisearch.js"></script>
+<script src="static/js/whatshere.js"></script>
+<script src="static/js/models.js"></script>
+<script src="static/js/visuals.js"></script>
+<script src="static/js/clouds.js"></script>
+<script src="static/js/tour.js"></script>
+<script src="static/js/presentation.js"></script>
+<script src="static/js/conflict.js"></script>
 
 <script>
 // ============================================================
@@ -1213,7 +1291,7 @@ var currentViewMode = 'normal';
 
 var layerState = {
   satellites: true, orbits: false, flights: false, military: false,
-  quakes: false, traffic: false, cctv: false, aurora: false, peaks: false, weather: false, eonet: false, conjunctions: true,
+  quakes: false, traffic: false, cctv: false, aurora: false, conflict: false, orbitviz: true, infra: false, aviation: false, intel: false, maritime: false, peaks: false, weather: false, eonet: false, conjunctions: true,
   covariance: false, sensors: false, trails: false, declutter: true
 };
 
@@ -1506,7 +1584,22 @@ var EXTENSIONS = [
   { global: 'SDASpaceWeather', mount: 'ext-spaceweather' },
   { global: 'SDAWeather', mount: 'ext-weather' },
   { global: 'SDAMapTools', mount: 'ext-maptools' },
-  { global: 'SDAPeaks', mount: 'ext-peaks' }
+  { global: 'SDAPeaks', mount: 'ext-peaks' },
+  { global: 'SDAMaritime', mount: 'ext-maritime' },
+  { global: 'SDAIntel', mount: 'ext-intel' },
+  { global: 'SDAAviation', mount: 'ext-aviation' },
+  { global: 'SDAInfra', mount: 'ext-infra' },
+  { global: 'SDAOrbitViz', mount: 'ext-orbitviz' },
+  { global: 'SDAViewMode', mount: 'ext-viewmode' },
+  { global: 'SDACamWall', mount: 'ext-camwall' },
+  { global: 'SDAOmniSearch', mount: 'ext-omnisearch' },
+  { global: 'SDAWhatsHere', mount: 'ext-whatshere' },
+  { global: 'SDAModels', mount: 'ext-models' },
+  { global: 'SDAVisuals', mount: 'ext-visuals' },
+  { global: 'SDAClouds', mount: 'ext-clouds' },
+  { global: 'SDATour', mount: 'ext-tour' },
+  { global: 'SDAPresent', mount: 'ext-presentation' },
+  { global: 'SDAConflict', mount: 'ext-conflict' }
 ];
 
 function wirePanelCollapse(h3) {
@@ -1526,6 +1619,7 @@ function initExtensions() {
         viewer: viewer,
         satEngine: satEngine,
         selectSatellite: selectSatellite,
+        showInfoCard: showInfoCard,
         addIntelItem: addIntelItem,
         api: API,
         isStatic: IS_STATIC,
@@ -1620,15 +1714,36 @@ function initCesium() {
     // While a map tool is drawing, clicks place points, not select satellites.
     if (window.SDAMapTools && SDAMapTools.isActive()) return;
     var picked = scene.pick(click.position);
+    // A field drawn over everything (the aurora oval at 110 km) only answers a
+    // click when nothing of its own lies under the cursor.
+    if (Cesium.defined(picked) && picked.id && picked.id.sdaBackground) {
+      try {
+        var under = scene.drillPick(click.position, 5).filter(function(p) {
+          return p && p.id && !p.id.sdaBackground;
+        })[0];
+        if (under) picked = under;
+      } catch (e) { /* keep the field */ }
+    }
     if (Cesium.defined(picked) && picked.id && picked.id.type === 'satellite' && satEngine.active) {
       selectSatellite(picked.id.noradId); // point primitive from the satellite engine
+    } else if (Cesium.defined(picked) && picked.id && typeof picked.id.sdaPick === 'function') {
+      // Primitives drawn by a module (static/js/cameras.js) carry their own action,
+      // and so do the 3D models static/js/models.js puts on feed rows (entities
+      // whose click belongs to the feed's own card), hence this test comes first.
+      // The click's window position is passed for fields such as the aurora oval,
+      // where what is under the cursor depends on where inside the shape it is.
+      try { picked.id.sdaPick(click.position); } catch (e) { addIntelItem('Pick failed: ' + e.message); }
+    } else if (Cesium.defined(picked) && picked.id instanceof Cesium.Entity &&
+               orbitNoradOf(picked.id) != null && satEngine.byNoradId[orbitNoradOf(picked.id)]) {
+      selectSatellite(orbitNoradOf(picked.id)); // an orbit line belongs to its satellite
     } else if (Cesium.defined(picked) && picked.id instanceof Cesium.Entity) {
       selectEntity(picked.id);
-    } else if (Cesium.defined(picked) && picked.id && typeof picked.id.sdaPick === 'function') {
-      // Primitives drawn by a module (static/js/cameras.js) carry their own action.
-      try { picked.id.sdaPick(); } catch (e) { addIntelItem('Pick failed: ' + e.message); }
     } else {
-      deselectEntity();
+      // Cesium draws the Sun and the Moon but cannot pick them; static/js/skyview.js
+      // tests a click that misses the Earth against both and names what it hit.
+      var body = (!Cesium.defined(picked) && window.SDASkyView && SDASkyView.spaceBodyAt)
+        ? SDASkyView.spaceBodyAt(viewer, click.position) : null;
+      if (body) showInfoCard(body); else deselectEntity();
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -1867,6 +1982,8 @@ function applyWorkerTrack(msg) {
   if (positions.length >= 2) {
     selectedOrbitEntity = viewer.entities.add({
       id: 'selected-orbit',
+      name: s.name + ' orbit',
+      properties: { type: 'orbit', norad_id: s.noradId },
       polyline: {
         positions: positions, width: 1.5,
         material: new Cesium.ColorMaterialProperty(Cesium.Color.fromAlpha(s.color, 0.45)),
@@ -1882,6 +1999,8 @@ function applyWorkerTrack(msg) {
   if (groundPts.length >= 2) {
     selectedGroundTrackEntity = viewer.entities.add({
       id: 'selected-ground-track',
+      name: s.name + ' ground track',
+      properties: { type: 'orbit', norad_id: s.noradId },
       polyline: {
         positions: groundPts, width: 1.0, clampToGround: false,
         material: new Cesium.PolylineDashMaterialProperty({
@@ -2260,6 +2379,8 @@ function drawSelectedOrbit(s) {
   if (positions.length < 2) return;
   selectedOrbitEntity = viewer.entities.add({
     id: 'selected-orbit',
+    name: s.name + ' orbit',
+    properties: { type: 'orbit', norad_id: s.noradId },
     polyline: {
       positions: positions, width: 1.5,
       material: new Cesium.ColorMaterialProperty(Cesium.Color.fromAlpha(s.color, 0.45)),
@@ -2267,6 +2388,8 @@ function drawSelectedOrbit(s) {
   });
   selectedGroundTrackEntity = viewer.entities.add({
     id: 'selected-ground-track',
+    name: s.name + ' ground track',
+    properties: { type: 'orbit', norad_id: s.noradId },
     polyline: {
       positions: groundPts, width: 1.0,
       material: new Cesium.PolylineDashMaterialProperty({
@@ -2642,6 +2765,8 @@ function renderVisibleOrbits() {
     var lineId = 'orbit-' + orbit.norad_id;
     orbitPolylines[lineId] = viewer.entities.add({
       id: lineId,
+      name: (orbit.name || 'NORAD ' + orbit.norad_id) + ' orbit',
+      properties: { type: 'orbit', norad_id: orbit.norad_id },
       polyline: {
         positions: positions, width: 1,
         material: new Cesium.ColorMaterialProperty(Cesium.Color.CYAN.withAlpha(0.25)),
@@ -2916,6 +3041,10 @@ function spawnTrafficParticles() {
 
       var pos = interpolateRoad(coords, progress);
       var entity = viewer.entities.add({
+        name: 'Traffic flow on a ' + road.type + ' road',
+        properties: { type: 'traffic', detail_rows: [
+          ['ROAD', road.type], ['SOURCE', 'OpenStreetMap roads (Overpass)'],
+          ['MEANING', 'Animated flow along the road, not a tracked vehicle']] },
         position: Cesium.Cartesian3.fromDegrees(pos.lon, pos.lat, 20),
         point: { pixelSize: detectionMode ? 5 : 3, color: ptColor.withAlpha(0.8), outlineWidth: 0 },
       });
@@ -3075,6 +3204,14 @@ async function fetchConjunctionGlobeData(hours, threshold) {
 }
 
 // ===== ENTITY SELECTION =====
+// The NORAD id an orbit or ground-track line was drawn for, else null.
+function orbitNoradOf(entity) {
+  var props = entity && entity.properties;
+  if (!props || !props.type || props.type.getValue() !== 'orbit' || !props.norad_id) return null;
+  var nid = props.norad_id.getValue();
+  return nid == null ? null : nid;
+}
+
 function selectEntity(entity) {
   selectedEntity = entity;
   var panel = $('info-panel');
@@ -3090,9 +3227,14 @@ function selectEntity(entity) {
 
   if (type === 'conjunction' && props) {
     var idx = props.eventIndex ? props.eventIndex.getValue() : 0;
-    if (conjEvents[idx]) { openConjunctionDetail(conjEvents[idx]); }
-    info.appendChild(makeInfoRow('TYPE', 'CONJUNCTION EVENT'));
-    info.appendChild(makeInfoRow('INDEX', String(idx)));
+    var cev = conjEvents[idx];
+    if (cev) {
+      openConjunctionDetail(cev);
+      info.appendChild(makeInfoRow('RISK', String(cev.risk)));
+      if (isFinite(Number(cev.miss_distance_km))) info.appendChild(makeInfoRow('MISS DIST', Number(cev.miss_distance_km).toFixed(3) + ' km'));
+      if (isFinite(Number(cev.relative_velocity_km_s))) info.appendChild(makeInfoRow('REL VEL', Number(cev.relative_velocity_km_s).toFixed(2) + ' km/s'));
+      if (cev.tca) info.appendChild(makeInfoRow('CLOSEST AT', String(cev.tca).replace('T', ' ').slice(0, 19) + ' UTC'));
+    }
   } else if (type === 'satellite' && props) {
     info.appendChild(makeInfoRow('NORAD ID', String(props.norad_id ? props.norad_id.getValue() : '')));
     info.appendChild(makeInfoRow('ALTITUDE', (props.alt_km ? props.alt_km.getValue().toFixed(1) : '0') + ' km'));
@@ -3139,6 +3281,25 @@ function selectEntity(entity) {
   }
 
   addIntelItem('Tracking: ' + (entity.name || 'Unknown entity'));
+}
+
+// The same info panel for things that are not entities: a module passes a name,
+// a type and [label, value] rows (static/js/aurora.js for the oval under a click).
+function showInfoCard(card) {
+  if (!card) return;
+  selectedEntity = null;
+  viewer.trackedEntity = undefined;
+  var info = $('entity-info');
+  info.replaceChildren();
+  info.appendChild(makeInfoRow('NAME', String(card.name || 'Unknown')));
+  info.appendChild(makeInfoRow('TYPE', String(card.type || 'unknown').toUpperCase()));
+  (card.rows || []).forEach(function(r) {
+    if (r && r.length === 2 && r[1] !== null && r[1] !== undefined && r[1] !== '') {
+      info.appendChild(makeInfoRow(String(r[0]), String(r[1])));
+    }
+  });
+  $('info-panel').classList.remove('hidden');
+  addIntelItem('Selected: ' + String(card.name || 'Unknown'));
 }
 
 function deselectEntity() {
@@ -3433,6 +3594,9 @@ function cameraFrame() {
   // Orbital objects need a stand-off of hundreds of km to read as a chase;
   // aircraft need a few km. Both are clamped so the pose never clips terrain.
   var rangeM = altM > 1.0e5 ? Math.max(1.5e5, altM * 0.30) : Math.max(2500, altM * 0.8 + 1500);
+  // A target drawn as a 3D model (static/js/models.js) is framed by its size.
+  var rideM = window.SDAModels && SDAModels.rideRange(camState.targetKind, camState.targetId, altM);
+  if (rideM) rangeM = rideM;
 
   var pose;
   if (camState.mode === 'chase') {
@@ -3591,6 +3755,23 @@ function clearSensorLayer() {
   sensorState.entities = [];
 }
 
+// What a click on a site, its field of regard or a spoke shows.
+function sensorRows(sensor) {
+  var rows = [['KIND', String(sensor.sensor_type || 'sensor').toUpperCase()]];
+  if (sensor.country) rows.push(['COUNTRY', sensor.country]);
+  rows.push(['POSITION', Math.abs(sensor.latitude_deg).toFixed(2) + (sensor.latitude_deg >= 0 ? ' N, ' : ' S, ') +
+    Math.abs(sensor.longitude_deg).toFixed(2) + (sensor.longitude_deg >= 0 ? ' E' : ' W')]);
+  if (sensor.max_range_km) rows.push(['RANGE', Math.round(sensor.max_range_km).toLocaleString('en-US') + ' km']);
+  if (sensor.min_elevation_deg != null) rows.push(['LOWEST LOOK', sensor.min_elevation_deg + ' deg above the horizon']);
+  if (sensor.azimuth_min_deg != null && sensor.azimuth_max_deg != null) {
+    rows.push(['FACES', 'azimuth ' + sensor.azimuth_min_deg + ' to ' + sensor.azimuth_max_deg + ' deg']);
+  }
+  if (sensorState.covering[sensor.name]) rows.push(['SEES SELECTED', 'yes, right now']);
+  if (sensor.note) rows.push(['NOTE', sensor.note]);
+  rows.push(['SOURCE', 'Approximate public coordinates, illustrative only']);
+  return rows;
+}
+
 // The footprint is the field of regard projected onto one reference altitude
 // shell (default 550 km). Drawing the full slant-range footprint would cover a
 // third of the globe for the long-range radars and tell the operator nothing.
@@ -3624,7 +3805,7 @@ function drawSensorLayer() {
         pixelOffset: new Cesium.Cartesian2(8, -6),
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 2.5e7)
       },
-      properties: { type: 'sensor', sensor_name: sensor.name }
+      properties: { type: 'sensor', sensor_name: sensor.name, detail_rows: sensorRows(sensor) }
     });
     sensorState.entities.push(site);
 
@@ -3634,7 +3815,7 @@ function drawSensorLayer() {
     var ring = fp.wedge
       ? [sensor.longitude_deg, sensor.latitude_deg].concat(fp.rim)
       : fp.rim;
-    sensorState.entities.push(viewer.entities.add({
+    var fov = viewer.entities.add({
       name: sensor.name + ' field of regard',
       polygon: {
         hierarchy: Cesium.Cartesian3.fromDegreesArray(ring),
@@ -3643,19 +3824,26 @@ function drawSensorLayer() {
         outlineColor: color.withAlpha(hot ? 0.9 : 0.4),
         height: 0
       },
-      properties: { type: 'sensor-fov', sensor_name: sensor.name }
-    }));
+      properties: { type: 'sensor-fov', sensor_name: sensor.name,
+        detail_rows: [['MEANING', 'Where this site can see an object at ' +
+          Math.round(sensorState.shellAltKm) + ' km altitude']].concat(sensorRows(sensor)) }
+    });
+    fov.sdaBackground = true; // aircraft and ships inside it still answer a click
+    sensorState.entities.push(fov);
 
     var spokes = WorldViewTactical.footprintSpokes(sensor, fp, fp.wedge ? 2 : 4);
     for (var k = 0; k < spokes.length; k++) {
-      sensorState.entities.push(viewer.entities.add({
+      var spoke = viewer.entities.add({
+        name: sensor.name + ' field of regard',
         polyline: {
           positions: Cesium.Cartesian3.fromDegreesArray(spokes[k]),
           width: 1,
           material: color.withAlpha(hot ? 0.7 : 0.25)
         },
-        properties: { type: 'sensor-fov', sensor_name: sensor.name }
-      }));
+        properties: { type: 'sensor-fov', sensor_name: sensor.name, detail_rows: sensorRows(sensor) }
+      });
+      spoke.sdaBackground = true;
+      sensorState.entities.push(spoke);
     }
   }
   viewer.scene.requestRender();
@@ -3827,6 +4015,24 @@ function toggleLayer(layer, enabled) {
   if (layer === 'peaks') {
     if (window.SDAPeaks) window.SDAPeaks.setEnabled(enabled);
   }
+  if (layer === 'maritime') {
+    if (window.SDAMaritime) window.SDAMaritime.setEnabled(enabled);
+  }
+  if (layer === 'intel') {
+    if (window.SDAIntel) window.SDAIntel.setEnabled(enabled);
+  }
+  if (layer === 'aviation') {
+    if (window.SDAAviation) window.SDAAviation.setEnabled(enabled);
+  }
+  if (layer === 'infra') {
+    if (window.SDAInfra) window.SDAInfra.setEnabled(enabled);
+  }
+  if (layer === 'orbitviz') {
+    if (window.SDAOrbitViz) window.SDAOrbitViz.setEnabled(enabled);
+  }
+  if (layer === 'conflict') {
+    if (window.SDAConflict) SDAConflict.setEnabled(enabled);
+  }
   if (layer === 'sensors') {
     if (enabled) {
       loadSensors().then(function () { drawSensorLayer(); refreshSensorCoverage(true); });
@@ -3906,7 +4112,7 @@ function updateFPS() {
 // the link in another browser and you get the same picture.
 var SHARE_VERSION = '1';
 var SHARE_LAYER_KEYS = ['satellites', 'orbits', 'flights', 'military', 'quakes',
-                        'conjunctions', 'covariance', 'traffic', 'cctv', 'aurora', 'peaks', 'weather', 'eonet',
+                        'conjunctions', 'covariance', 'traffic', 'cctv', 'aurora', 'conflict', 'orbitviz', 'infra', 'aviation', 'intel', 'maritime', 'peaks', 'weather', 'eonet',
                         'sensors', 'trails', 'declutter'];
 var pendingShare = null;
 var copyLinkTimer = null;
@@ -4088,7 +4294,7 @@ function setupEventListeners() {
     'layer-satellites': 'satellites', 'layer-orbits': 'orbits', 'layer-flights': 'flights',
     'layer-military': 'military', 'layer-quakes': 'quakes', 'layer-conjunctions': 'conjunctions',
     'layer-covariance': 'covariance', 'layer-traffic': 'traffic', 'layer-cctv': 'cctv',
-    'layer-aurora': 'aurora', 'layer-peaks': 'peaks', 'layer-weather': 'weather', 'layer-eonet': 'eonet',
+    'layer-aurora': 'aurora', 'layer-conflict': 'conflict', 'layer-orbitviz': 'orbitviz', 'layer-infra': 'infra', 'layer-aviation': 'aviation', 'layer-intel': 'intel', 'layer-maritime': 'maritime', 'layer-peaks': 'peaks', 'layer-weather': 'weather', 'layer-eonet': 'eonet',
     'layer-sensors': 'sensors', 'layer-trails': 'trails', 'layer-declutter': 'declutter',
   };
   for (var elId in layerMap) {
@@ -4232,6 +4438,15 @@ function setupEventListeners() {
       case "'":
         if (window.SDAMapTools) SDAMapTools.action('screenshot');
         break;
+      case '`':
+        if (window.SDAViewMode) window.SDAViewMode.cycle();
+        break;
+      case '\\':
+        if (window.SDAWhatsHere) window.SDAWhatsHere.openAtCentre();
+        break;
+      case '=':
+        if (window.SDACamWall) window.SDACamWall.toggle();
+        break;
       case 'z': case 'Z':
         $('layer-aurora').checked = !$('layer-aurora').checked;
         toggleLayer('aurora', $('layer-aurora').checked); break;
@@ -4317,11 +4532,17 @@ function renderConjunctionsOnGlobe(events) {
   for (var i = 0; i < events.length; i++) {
     var ev = events[i];
     var riskColor = Cesium.Color.fromCssColorString(RISK_COLORS[ev.risk] || '#888');
+    // Every piece of an event (both objects, the line, the ring, the shells) carries
+    // the pair's name and the event index, so any of them opens the event on a click.
+    var conjName = (ev.primary_name || String(ev.primary)) + ' and ' +
+      (ev.secondary_name || String(ev.secondary)) + ' (' + ev.risk + ')';
+    var conjProps = { type: 'conjunction', eventIndex: i };
 
     if (ev.primary_lat !== undefined) {
       var pid = 'conj-p-' + i;
       conjEntities[pid] = viewer.entities.add({
         id: pid,
+        name: conjName,
         position: Cesium.Cartesian3.fromDegrees(ev.primary_lon, ev.primary_lat, (ev.primary_alt_km || 400) * 1000),
         point: {
           pixelSize: ev.risk === 'CRITICAL' ? 12 : ev.risk === 'HIGH' ? 10 : 8,
@@ -4336,13 +4557,15 @@ function renderConjunctionsOnGlobe(events) {
           showBackground: true, backgroundColor: Cesium.Color.BLACK.withAlpha(0.7),
           scaleByDistance: new Cesium.NearFarScalar(1e6, 1, 1e8, 0.5),
         },
-        properties: { type: 'conjunction', eventIndex: i }
+        properties: conjProps
       });
 
       if (ev.secondary_lat !== undefined) {
         var lid = 'conj-line-' + i;
         conjEntities[lid] = viewer.entities.add({
           id: lid,
+          name: conjName,
+          properties: conjProps,
           polyline: {
             positions: [
               Cesium.Cartesian3.fromDegrees(ev.primary_lon, ev.primary_lat, (ev.primary_alt_km || 400) * 1000),
@@ -4358,6 +4581,7 @@ function renderConjunctionsOnGlobe(events) {
         var sid = 'conj-s-' + i;
         conjEntities[sid] = viewer.entities.add({
           id: sid,
+          name: conjName,
           position: Cesium.Cartesian3.fromDegrees(ev.secondary_lon, ev.secondary_lat, (ev.secondary_alt_km || 400) * 1000),
           point: {
             pixelSize: ev.risk === 'CRITICAL' ? 10 : 8,
@@ -4371,7 +4595,7 @@ function renderConjunctionsOnGlobe(events) {
             pixelOffset: new Cesium.Cartesian2(12, -10),
             scaleByDistance: new Cesium.NearFarScalar(1e6, 1, 1e8, 0.4),
           },
-          properties: { type: 'conjunction', eventIndex: i }
+          properties: conjProps
         });
       }
 
@@ -4380,6 +4604,8 @@ function renderConjunctionsOnGlobe(events) {
         var ringRadius = Math.max(50000, ev.miss_distance_km * 5000);
         conjEntities[ringId] = viewer.entities.add({
           id: ringId,
+          name: conjName,
+          properties: conjProps,
           position: Cesium.Cartesian3.fromDegrees(ev.primary_lon, ev.primary_lat, (ev.primary_alt_km || 400) * 1000),
           ellipsoid: {
             radii: new Cesium.Cartesian3(ringRadius, ringRadius, ringRadius),
@@ -4430,6 +4656,8 @@ function drawCovarianceEllipsoids(i, ev, riskColor) {
       var eid = 'conj-cov-' + o.key + shells[q].n + '-' + i;
       conjEntities[eid] = viewer.entities.add({
         id: eid,
+        name: shells[q].n + '-sigma position uncertainty, ' + o.name,
+        properties: { type: 'conjunction', eventIndex: i },
         position: pos,
         ellipsoid: {
           radii: new Cesium.Cartesian3(r, r, r),
@@ -4446,6 +4674,8 @@ function drawCovarianceEllipsoids(i, ev, riskColor) {
     var lblId = 'conj-cov-lbl-' + o.key + '-' + i;
     conjEntities[lblId] = viewer.entities.add({
       id: lblId,
+      name: 'Position uncertainty, ' + o.name,
+      properties: { type: 'conjunction', eventIndex: i },
       position: pos,
       label: {
         text: '1 SIGMA ' + sigmaKm.toFixed(3) + ' km / 3 SIGMA ' + (sigmaKm * 3).toFixed(3) + ' km\n' + note + ageTxt,
@@ -5115,7 +5345,7 @@ async function init() {
     setLoadingProgress(100, 'SYSTEMS ONLINE');
     addIntelItem('Vantage initialized, all systems operational');
     addIntelItem('Keys: 1-6 styles, 7-0 camera, S/F/M/Q/J/V/E layers, A trails, X declutter, ? help');
-    setTimeout(hideLoading, 600);
+    (window.SDAPresent ? SDAPresent.whenSettled(6000) : Promise.resolve()).then(hideLoading);
   } catch (e) {
     setLoadingProgress(0, 'INIT FAILED: ' + e.message);
   }

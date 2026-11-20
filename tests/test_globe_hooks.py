@@ -15,6 +15,7 @@ They skip cleanly when Node is not installed.
 """
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -478,7 +479,11 @@ def test_modules_get_the_hooks_and_the_mounts(page):
         assert hook in init, hook
     for mount in ("ext-categories", "ext-isscam", "ext-conjactions", "ext-cameras",
                   "ext-skyview", "ext-aurora", "ext-nasaimagery", "ext-summit", "ext-dossier",
-                  "ext-spaceweather", "ext-weather", "ext-maptools", "ext-peaks"):
+                  "ext-spaceweather", "ext-weather", "ext-maptools", "ext-peaks",
+                  "ext-maritime", "ext-intel", "ext-aviation", "ext-infra", "ext-orbitviz",
+                  "ext-viewmode", "ext-camwall", "ext-omnisearch", "ext-whatshere",
+                  "ext-models", "ext-visuals", "ext-clouds", "ext-tour", "ext-presentation",
+                  "ext-conflict"):
         assert page.count(f'<div id="{mount}"></div>') == 1, mount
 
 
@@ -494,3 +499,72 @@ def test_panel_mounts_sit_in_the_sidebar(page):
                if not start < m.start() < end and m.group(1) != "ext-conjactions"]
     assert outside == []
 
+
+
+def test_layer_toggles_pass_the_toggle_state_they_were_given(page):
+    """toggleLayer(layer, enabled) is the only name in scope for the new state. A branch
+    that passed some other name (``on``) threw a ReferenceError and left that layer dead."""
+    body = _function_source(page, "toggleLayer")
+    calls = re.findall(r"\.setEnabled\(([^)]*)\)", body)
+    assert calls, "no module toggles found in toggleLayer"
+    assert all(arg.strip() == "enabled" for arg in calls), calls
+
+
+def test_a_background_field_never_hides_what_lies_under_it(page):
+    """The aurora oval is a shell at 110 km over everything north of 20 degrees. A click
+    that lands on it first looks beneath (drillPick) for anything that is not a field,
+    and only a click on bare oval opens the oval's card, with the click position."""
+    start = page.index("handler.setInputAction(function(click) {")
+    body = page[start : page.index("Cesium.ScreenSpaceEventType.LEFT_CLICK", start)]
+    assert body.index("sdaBackground") < body.index("picked.id.type === 'satellite'")
+    assert "scene.drillPick(click.position" in body and "!p.id.sdaBackground" in body
+    assert "picked.id.sdaPick(click.position)" in body
+    assert "showInfoCard: showInfoCard" in page
+
+
+def _object_literal(src: str, start: int) -> str:
+    """The balanced ``{...}`` that opens at or after ``start``."""
+    i = src.index("{", start)
+    depth = 0
+    for j in range(i, len(src)):
+        if src[j] == "{":
+            depth += 1
+        elif src[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[i : j + 1]
+    raise AssertionError("unbalanced literal")
+
+
+def test_everything_the_page_draws_has_a_name(page):
+    """A click on an entity reports its name, so an unnamed one reads "Unknown
+    entity". The browser audit of 2026-11-19 found two: the 150 orbit lines and the
+    spokes of each sensor's field of regard."""
+    unnamed = []
+    for m in re.finditer(r"entities\.add\(\{", page):
+        lit = _object_literal(page, m.start())
+        if "name:" not in lit:
+            unnamed.append(page.count("\n", 0, m.start()) + 1)
+    assert unnamed == [], f"entities without a name at worldview.html lines {unnamed}"
+
+
+def test_an_orbit_line_selects_its_satellite(page):
+    start = page.index("handler.setInputAction(function(click) {")
+    body = page[start : page.index("Cesium.ScreenSpaceEventType.LEFT_CLICK", start)]
+    orbit = body.index("orbitNoradOf(picked.id)")
+    assert orbit < body.index("selectEntity(picked.id)")
+    assert "selectSatellite(orbitNoradOf(picked.id))" in body
+    assert page.count("properties: { type: 'orbit', norad_id:") == 5
+
+
+def test_a_sensor_field_of_regard_lets_clicks_through(page):
+    """The fields of regard cover thousands of kilometres; aircraft and ships inside
+    one must still answer a click, and the field itself says what it is."""
+    draw = page[page.index("function drawSensorLayer()") :]
+    draw = draw[: draw.index("\n}\n")]
+    assert draw.count(".sdaBackground = true") == 2  # the field and its spokes
+    assert draw.count("detail_rows: sensorRows(sensor)") == 2
+    assert "concat(sensorRows(sensor))" in draw
+    rows = page[page.index("function sensorRows(sensor)") :]
+    for label in ("'KIND'", "'POSITION'", "'RANGE'", "'SOURCE'"):
+        assert label in rows[: rows.index("\n}\n")]

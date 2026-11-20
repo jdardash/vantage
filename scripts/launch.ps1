@@ -88,7 +88,10 @@ $Keys = @(
     @{ Name = 'ANTHROPIC_API_KEY';     Cost = 'PAID'; Secret = $true;  Unlocks = 'agent chat (POST /agent/chat) through Claude';  From = 'console.anthropic.com, billed per token' }
     @{ Name = 'OPENAI_API_KEY';        Cost = 'PAID'; Secret = $true;  Unlocks = 'agent chat through an OpenAI-compatible API';   From = 'platform.openai.com, OpenRouter or Groq, billed per token' }
     @{ Name = 'FIRMS_MAP_KEY';         Cost = 'free'; Secret = $true;  Unlocks = 'NASA fire detections feed';                     From = 'firms.modaps.eosdis.nasa.gov/api/map_key' }
-    @{ Name = 'AISSTREAM_API_KEY';     Cost = 'free'; Secret = $true;  Unlocks = 'ship positions feed';                           From = 'aisstream.io' }
+    @{ Name = 'AISSTREAM_API_KEY';     Cost = 'free'; Secret = $true;  Unlocks = 'ship positions feed, maritime chokepoints and dark ships'; From = 'aisstream.io' }
+    @{ Name = 'ADSBLOL_API_KEY';       Cost = 'free'; Secret = $true;  Unlocks = 'adsb.lol beyond 500 keyless requests a day (aviation intel)'; From = 'adsb.lol (optional; the overlay works without it)' }
+    @{ Name = 'ACLED_EMAIL';           Cost = 'free'; Secret = $false; Unlocks = 'ACLED political violence events on the conflict layer'; From = 'acleddata.com account (optional; the layer works without it)' }
+    @{ Name = 'ACLED_PASSWORD';        Cost = 'free'; Secret = $true;  Unlocks = 'pairs with ACLED_EMAIL';                        From = 'same account' }
     @{ Name = 'OPENSKY_CLIENT_ID';     Cost = 'free'; Secret = $false; Unlocks = 'authenticated OpenSky flights (higher limits)'; From = 'opensky-network.org account, API client' }
     @{ Name = 'OPENSKY_CLIENT_SECRET'; Cost = 'free'; Secret = $true;  Unlocks = 'pairs with OPENSKY_CLIENT_ID';                  From = 'same page as the client id' }
     @{ Name = 'SDA_SPACETRACK_USER';   Cost = 'free'; Secret = $false; Unlocks = 'Space-Track GP, TIP and CDM pulls';             From = 'space-track.org account' }

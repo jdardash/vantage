@@ -439,6 +439,48 @@ def test_detail_mode_and_viewer(ran):
     assert any("Congress Ave" in line for line in d["feed"])
 
 
+scenario("same_view_while_loading", r"""
+  route('/api/cameras/summary', SUMMARY);
+  var release;
+  var held = new Promise(function (r) { release = r; });
+  var plain = window.fetch;
+  window.fetch = function (url) {
+    if (url.indexOf('/api/cameras?') !== 0) return plain(url);
+    REQUESTS.push(url);
+    return held.then(function () {
+      return { ok: true, status: 200, json: function () { return Promise.resolve({
+        count: 1, total: 1, capped: false, cameras: [{ rid: 11, name: 'Congress Ave',
+          lat: 30.27, lon: -97.74, group: 'traffic', feed: 'image', playable: true,
+          country: 'US', city: 'Austin' }] }); } };
+    });
+  };
+  var k = makeCtx(20000);
+  window.SDACameras.init(k.ctx);
+  window.SDACameras.setEnabled(true);
+  await settle();
+  // the camera stops again on the same view while the list is still on its way
+  k.ctx.viewer._moveEnd.forEach(function (fn) { fn(); });
+  await new Promise(function (r) { setTimeout(r, 420); });
+  release();
+  await settle();
+  window.fetch = plain;
+  return {
+    lists: REQUESTS.filter(function (u) { return u.indexOf('/api/cameras?') === 0; }).length,
+    count: countEl.textContent, view: byClass(k.ctx.mount, 'cams-view')[0].textContent
+  };
+""")
+
+
+def test_a_repeat_refresh_does_not_throw_away_the_answer_on_its_way(ran):
+    """Found by the all-layers browser audit of 2026-11-20: a refresh for the view
+    already asked for moved the sequence on, so the list that was loading was
+    discarded when it arrived and New York showed no cameras at all."""
+    d = ran["same_view_while_loading"]
+    assert d["lists"] == 1
+    assert d["count"] == "1"
+    assert "1 cameras in view" in d["view"]
+
+
 scenario("youtube_and_page", r"""
   route('/api/cameras/summary', SUMMARY);
   route('/api/cameras/5', { rid: 5, id: 'y', name: 'Times Square', type: 'landmark', group: 'city',

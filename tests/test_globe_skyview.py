@@ -232,6 +232,14 @@ var Astronomy = {
   Illumination: function () { return { mag: -2.135, phase_fraction: 0.7591 }; },
   MoonPhase: function () { return 121.13; }
 };
+// Only the identify scenario installs these two, so every other scenario also
+// proves a card survives an astronomy-engine call that is missing.
+var AstronomyExtras = {
+  Constellation: function (ra, dec) { return { name: dec > 30 ? 'Lyra' : 'Pisces' }; },
+  SearchRiseSet: function (body, obs, dir) {
+    return dir > 0 ? { date: new Date('2026-11-20T06:30:00Z') } : null;
+  }
+};
 
 var SKY = { stars: [[101.287, -16.716, -1.46, 0.0], [279.2347, 38.7837, 0.03, 0.0],
                     [10, 10, 5.4, 1.5]],
@@ -389,8 +397,18 @@ scenario("sky_rules", r"""
     colors: [-0.2, 0.1, 0.5, 0.8, 1.2, 1.8].map(S.starColor),
     near: S.nearestTarget([{ name: 'Far', enu: [1, 0, 0], priority: 0 },
                            { name: 'Close', enu: [0, 1, 0.02], priority: 1 }], [0, 1, 0], 4),
-    none: S.nearestTarget([{ name: 'Far', enu: [1, 0, 0] }], [0, 1, 0], 4)
+    none: S.nearestTarget([{ name: 'Far', enu: [1, 0, 0] }], [0, 1, 0], 4),
+    // A star 0.1 deg off and a satellite 1 deg off, reach 3.3 deg: the star.
+    onStar: S.nearestTarget([off('Sat', 1, -1), off('Star', 0.1, 1)], [0, 1, 0], 3.3).name,
+    // A satellite 0.3 deg off and a star 0.4 deg the other way: a near tie the
+    // satellite takes.
+    tie: S.nearestTarget([off('Sat', 0.3, -1), off('Star', -0.4, 1)], [0, 1, 0], 3.3).name
   };
+  // A target `deg` degrees from straight ahead ([0, 1, 0]).
+  function off(name, deg, priority) {
+    var r = deg * Math.PI / 180;
+    return { name: name, enu: [Math.sin(r), Math.cos(r), 0], priority: priority };
+  }
 """)
 
 
@@ -406,6 +424,9 @@ def test_sky_rules(ran):
     assert sizes == sorted(sizes, reverse=True) and sizes[-1] >= 1.4
     assert len(set(r["colors"])) == 6
     assert r["near"]["name"] == "Close" and r["none"] is None
+    # A click dead on a star names the star even with a satellite a degree away;
+    # the satellite only wins a near tie.
+    assert r["onStar"] == "Star" and r["tie"] == "Sat"
 
 
 # --- the module on a fake globe ------------------------------------------------------
@@ -486,6 +507,141 @@ scenario("enter_exit", r"""
     cameraDir: [cameraDir.x, cameraDir.y, cameraDir.z]
   };
 """)
+
+
+scenario("identify", r"""
+  var S = window.SDASkyView;
+  var iss = { name: 'ISS (ZARYA)', point: { show: true,
+    position: Cesium.Cartesian3.fromDegrees(-97.5, 30.5, 420000) } };
+  var picked = [];
+  var k = makeCtx({ byNoradId: { 25544: iss }, selectedId: null });
+  k.ctx.selectSatellite = function (id) { picked.push(id); };
+  var v = k.ctx.viewer;
+  S.init(k.ctx);
+  Object.keys(AstronomyExtras).forEach(function (n) { Astronomy[n] = AstronomyExtras[n]; });
+  window.Astronomy = Astronomy;
+  buttonNamed(k.ctx.mount, 'LOOK UP HERE').fire('click');
+  await settle();
+  var hud = byClass(document.body, 'sky-hud')[0];
+  var card = byClass(document.body, 'sky-card')[0];
+  function frame() { v._pre.forEach(function (fn) { fn(); }); }
+  function aim() {
+    frame();
+    var t = byClass(hud, 'sky-read')[0].textContent;
+    var mm = /AZ ([0-9.]+).*EL (-?[0-9.]+)\s+FOV ([0-9.]+)/.exec(t);
+    return { az: +mm[1], el: +mm[2], fovy: +mm[3] };
+  }
+  function enuOf(ra, dec) {
+    var rows = S.eqjToEnuRows(ROT), e = S.eqjVector(ra, dec);
+    return rows.map(function (r) { return r[0] * e[0] + r[1] * e[1] + r[2] * e[2]; });
+  }
+  // turn so a direction sits in view: drag right turns left, drag down looks up
+  function turnTo(az, el) {
+    var a = aim(), kpx = a.fovy / 900;
+    var daz = ((az - a.az + 540) % 360) - 180;
+    v.canvas.fire('pointerdown', { clientX: 800, clientY: 450 });
+    (winListeners.pointermove || []).forEach(function (fn) {
+      fn({ clientX: 800 - daz / kpx, clientY: 450 + (el - a.el) / kpx }); });
+    (winListeners.pointerup || []).forEach(function (fn) { fn({}); });
+  }
+  // the pixel a direction lands on, by inverting the pinhole in screenDirection
+  function pixelOf(d) {
+    var a = aim();
+    var f = S.enuDirection(a.az, a.el), b = S.levelBasis(a.az, a.el);
+    function dot(x, y) { return x[0] * y[0] + x[1] * y[1] + x[2] * y[2]; }
+    var kk = Math.tan(a.fovy * Math.PI / 360) / 450, z = dot(d, f);
+    return { x: 800 + dot(d, b.right) / z / kk, y: 450 - dot(d, b.up) / z / kk };
+  }
+  // a real click: press and release on the same pixel
+  function click(px) {
+    v.canvas.fire('pointerdown', { clientX: px.x, clientY: px.y });
+    (winListeners.pointerup || []).forEach(function (fn) {
+      fn({ clientX: px.x, clientY: px.y }); });
+    return card.style.display === 'block' ? card.textContent : null;
+  }
+  function rows() {
+    return byClass(card, 'sky-card-row').map(function (r) {
+      return [r.children[0].textContent, r.children[1].textContent]; });
+  }
+
+  var vega = enuOf(279.2347, 38.7837);
+  var vAe = S.azElOf(vega);
+  turnTo(vAe.az, vAe.el);
+  var vegaText = click(pixelOf(vega));
+  var vegaTitle = byClass(card, 'sky-card-title')[0].textContent;
+  var vegaKind = byClass(card, 'sky-card-kind')[0].textContent;
+  var vegaRows = rows();
+  var round = S.screenDirection(aim().az, aim().el, aim().fovy, pixelOf(vega).x - 800,
+                                pixelOf(vega).y - 450, 900);
+
+  var moon = enuOf(45, 10);
+  var mAe = S.azElOf(moon);
+  turnTo(mAe.az, Math.max(-20, mAe.el));
+  click(pixelOf(moon));
+  var moonTitle = byClass(card, 'sky-card-title')[0].textContent;
+  var moonKind = byClass(card, 'sky-card-kind')[0].textContent;
+  var moonFact = byClass(card, 'sky-card-fact')[0].textContent;
+  var moonRows = rows();
+
+  // the ISS passes almost straight overhead: look up and sweep the view for it
+  var hits = [];
+  turnTo(0, 89);
+  for (var y2 = 0; y2 <= 900 && !hits.length; y2 += 15) {
+    for (var x2 = 0; x2 <= 1600; x2 += 15) {
+      var got2 = S.identifyAt(x2, y2);
+      if (got2 && got2.kind === 'Satellite overhead') { hits.push(got2); break; }
+    }
+  }
+  var act = byClass(card, 'sky-card-act')[0];
+  if (act) act.fire('click');
+
+  var empty = S.identifyAt(-5000, -5000);
+  var emptyShown = card.style.display;
+  click(pixelOf(vega));
+  var escOnce = document.fire('keydown', { key: 'Escape', target: document.body });
+  var afterEsc = { card: card.style.display, active: S.isActive() };
+  document.fire('keydown', { key: 'Escape', target: document.body });
+  return {
+    vegaText: vegaText, vegaTitle: vegaTitle, vegaKind: vegaKind, vegaRows: vegaRows,
+    roundTrip: round.map(function (x, i) { return Math.abs(x - vega[i]); }),
+    moonTitle: moonTitle, moonKind: moonKind, moonFact: moonFact, moonRows: moonRows,
+    sat: hits[0] || null, picked: picked, empty: empty, emptyShown: emptyShown,
+    afterEsc: afterEsc, stopped: !!escOnce.immediate, exited: !S.isActive(),
+    cardAfterExit: card.style.display,
+    when: [S.whenText(new Date('2026-11-20T06:30:00Z'), new Date('2026-11-20T04:00:00Z')),
+           S.whenText(new Date('2026-11-20T03:00:00Z'), new Date('2026-11-20T04:00:00Z')),
+           S.whenText(null, new Date())],
+    raDec: S.raDecOf(S.eqjVector(279.2347, 38.7837))
+  };
+""")
+
+
+def test_clicking_the_sky_says_what_is_there(ran):
+    r = ran["identify"]
+    # a star: name, kind, magnitude and constellation
+    assert r["vegaTitle"] == "Vega" and r["vegaKind"] == "Star"
+    rows = dict(r["vegaRows"])
+    assert rows["Brightness"] == "magnitude +0.03" and rows["In"] == "Lyra"
+    assert rows["Position"].startswith("alt 10.1 deg, az 309")
+    assert rows["RA / Dec"] == "18.62 h / +38.8 deg"
+    assert all(d < 1e-9 for d in r["roundTrip"])
+    # a solar system body: what it is, how lit, how far, when it rises and sets
+    assert r["moonTitle"] == "Moon" and r["moonKind"] == "Moon of Earth"
+    assert "27.3 days" in r["moonFact"]
+    moon = dict(r["moonRows"])
+    assert moon["Phase"] == "Waxing gibbous" and moon["Lit"] == "76%"
+    assert moon["Brightness"] == "magnitude -2.1"
+    assert moon["Rises"] == "06:30 UTC, in 2 h 30 min" and moon["Sets"] == "not in the next 2 days"
+    assert "Distance" not in moon  # the fake Equator gives no distance, so the row is left out
+    # a satellite overhead opens its own card
+    assert r["sat"] is not None and r["sat"]["title"] == "ISS (ZARYA)"
+    assert r["sat"]["norad"] == 25544 and r["picked"] == [25544]
+    # empty sky closes the card; Esc closes the card before it leaves the sky
+    assert r["empty"] is None and r["emptyShown"] == "none"
+    assert r["afterEsc"] == {"card": "none", "active": True} and r["stopped"]
+    assert r["exited"] and r["cardAfterExit"] == "none"
+    assert r["when"] == ["06:30 UTC, in 2 h 30 min", "03:00 UTC", "--"]
+    assert abs(r["raDec"]["ra"] - 18.6156) < 1e-3 and abs(r["raDec"]["dec"] - 38.7837) < 1e-9
 
 
 def test_enter_draws_the_sky_and_exit_restores_the_globe(ran):
@@ -581,3 +737,71 @@ def test_module_pins_and_policy():
     assert "sha384-LTVHvxfbG3XHla4Lu0C0s9U18B2sBOuzJIeOoVHm2t05SOOORvMbBMEVjXrGau9g" in text
     assert "innerHTML" not in text
     assert all(ord(ch) < 127 for ch in text), "skyview.js must stay ASCII"
+
+
+# --- the Sun and the Moon on the globe's space view ----------------------------------
+
+scenario("space_bodies", r"""
+  var S = window.SDASkyView;
+  var e = 23.4393 * Math.PI / 180, AU = 149597870700, MOON = 384400000;
+  var sunI = [AU, 0, 0];
+  var quarter = [0, MOON * Math.cos(e), MOON * Math.sin(e)];  // 90 deg east of the Sun
+  var cam = [7000000, 0, 0];
+  function dirTo(deg) { var r = deg * Math.PI / 180; return [Math.cos(r), Math.sin(r), 0]; }
+  var moonAhead = [{ key: 'Moon', pos: [MOON, 0, 0] }];
+  var both = [{ key: 'Sun', pos: [-AU, 0, 0] }, { key: 'Moon', pos: [MOON, 0, 0] }];
+  var moonCard = S.describeSpaceBody('Moon', sunI, quarter, [0, 0, MOON]);
+  var sunCard = S.describeSpaceBody('Sun', sunI, quarter, [0, -AU, 0]);
+  return {
+    lon: [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(function (v) {
+      return Math.round(S.eclipticLongitude(v) * 1000) / 1000; }),
+    phase: Math.round(S.moonPhaseDeg(sunI, quarter) * 1000) / 1000,
+    full: Math.round(S.moonPhaseDeg(sunI, [-MOON, 0, 0])),
+    lit: [0, 90, 180].map(function (d) { return Math.round(S.litFraction(d) * 100); }),
+    sub: S.subPoint([0, 0, 5]), subEq: S.subPoint([0, -3, 0]),
+    onMoon: S.bodyUnderRay(dirTo(0), cam, moonAhead),
+    nearMoon: S.bodyUnderRay(dirTo(1.0), cam, moonAhead),
+    pastMoon: S.bodyUnderRay(dirTo(2.0), cam, moonAhead),
+    onSun: S.bodyUnderRay(dirTo(178.0), cam, both),
+    emptySky: S.bodyUnderRay(dirTo(90), cam, both),
+    moonCard: moonCard, sunCard: sunCard,
+    noViewer: S.spaceBodyAt(null, { x: 1, y: 1 })
+  };
+""")
+
+
+def test_clicking_the_sun_or_moon_in_space_says_what_it_is(ran):
+    """Cesium draws both on the globe view but cannot pick them; the page tests a
+    click that misses the Earth against their directions (2026-11-20)."""
+    r = ran["space_bodies"]
+    assert r["lon"] == [0, 90, 90]
+    assert r["phase"] == 90 and r["full"] == 180
+    assert r["lit"] == [0, 50, 100]
+    assert round(r["sub"]["lat"]) == 90 and round(r["subEq"]["lon"]) == -90
+    assert r["onMoon"]["key"] == "Moon" and r["onMoon"]["angle"] < 1e-6
+    assert round(r["onMoon"]["rangeKm"]) == 377400
+    assert r["nearMoon"]["key"] == "Moon"  # inside the 1.2 degree reach
+    assert r["pastMoon"] is None
+    assert r["onSun"]["key"] == "Sun" and r["emptySky"] is None
+    moon = dict(r["moonCard"]["rows"])
+    assert r["moonCard"]["name"] == "The Moon" and r["moonCard"]["type"] == "Moon of Earth"
+    assert moon["PHASE"] == "First quarter, 50% lit"
+    assert moon["DISTANCE"] == "384,400 km from the centre of the Earth"
+    assert moon["OVERHEAD AT"] == "90.0 N, 0.0 E"
+    sun = dict(r["sunCard"]["rows"])
+    assert r["sunCard"]["name"] == "The Sun" and r["sunCard"]["type"] == "Star"
+    assert sun["DISTANCE"] == "1.000 AU, light takes 8.3 min"
+    assert sun["OVERHEAD AT"] == "0.0 N, 90.0 W"
+    assert "1.39 million km" in sun["WHAT"]
+    assert r["noViewer"] is None
+
+
+def test_the_page_asks_about_the_sun_and_moon_only_for_empty_clicks():
+    page = (Path(__file__).resolve().parent.parent / "src" / "sda" / "templates"
+            / "worldview.html").read_text(encoding="utf-8")
+    start = page.index("handler.setInputAction(function(click) {")
+    body = page[start : page.index("Cesium.ScreenSpaceEventType.LEFT_CLICK", start)]
+    tail = body[body.rindex("} else {"):]
+    assert "!Cesium.defined(picked)" in tail
+    assert "SDASkyView.spaceBodyAt(viewer, click.position)" in tail
+    assert "showInfoCard(body)" in tail and "deselectEntity()" in tail

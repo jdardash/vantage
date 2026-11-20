@@ -1,0 +1,3 @@
+US.CA	California	California	5332921
+US.WA	Washington	Washington	5815135
+NP.01	Bagmati	Bagmati	1

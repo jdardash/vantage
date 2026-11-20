@@ -2990,14 +2990,20 @@
       }
       var near = function (lon, lat) { return labelFacesCamera(lon, lat, camLon, camLat, camH); };
       var clampLines = terrainLive();
+      // A grid line names itself on a click, and anything drawn under it still answers first.
+      var gridLine = function (spec, name) {
+        spec.name = name;
+        spec.properties = { type: 'grid line', detail_rows: [['MEANING', 'Latitude and longitude graticule (GRID button)']] };
+        gridDs.entities.add(spec).sdaBackground = true;
+      };
       var count = 0;
       g.meridians.forEach(function (mm) {
         var pts = [];
         var stepLat = Math.max((mm.north - mm.south) / 6, 1e-6);
         for (var lat = mm.south; lat < mm.north; lat += stepLat) pts.push([mm.lon, lat]);
         pts.push([mm.lon, mm.north]);
-        gridDs.entities.add({ polyline: { positions: degArray(pts), width: 1, material: lineColor, arcType: C.ArcType.GEODESIC, clampToGround: clampLines } });
-        if (near(mm.lon, midLat)) gridDs.entities.add({ position: deg(mm.lon, midLat), label: labelGraphics(mm.label, '#ffb000', true) });
+        gridLine({ polyline: { positions: degArray(pts), width: 1, material: lineColor, arcType: C.ArcType.GEODESIC, clampToGround: clampLines } }, 'Meridian ' + mm.label);
+        if (near(mm.lon, midLat)) gridLine({ position: deg(mm.lon, midLat), label: labelGraphics(mm.label, '#ffb000', true) }, 'Meridian ' + mm.label);
         count++;
       });
       g.parallels.forEach(function (pp) {
@@ -3005,8 +3011,8 @@
         var stepLon = Math.min(10, Math.max((pp.east - pp.west) / 8, 1e-6));
         for (var lon = pp.west; lon < pp.east; lon += stepLon) pts.push([lon, pp.lat]);
         pts.push([pp.east, pp.lat]);
-        gridDs.entities.add({ polyline: { positions: degArray(pts), width: 1, material: lineColor, arcType: C.ArcType.RHUMB, clampToGround: clampLines } });
-        if (near(midLon, pp.lat)) gridDs.entities.add({ position: deg(midLon, pp.lat), label: labelGraphics(pp.label, '#ffb000', true) });
+        gridLine({ polyline: { positions: degArray(pts), width: 1, material: lineColor, arcType: C.ArcType.RHUMB, clampToGround: clampLines } }, 'Parallel ' + pp.label);
+        if (near(midLon, pp.lat)) gridLine({ position: deg(midLon, pp.lat), label: labelGraphics(pp.label, '#ffb000', true) }, 'Parallel ' + pp.label);
         count++;
       });
       return count;

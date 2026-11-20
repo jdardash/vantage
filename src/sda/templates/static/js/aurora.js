@@ -169,6 +169,23 @@
     return { north: north, south: south };
   }
 
+  // The chance at a point: the strongest drawn cell within a degree of it (the
+  // OVATION grid is one degree), or 0 where nothing at or above the threshold is.
+  function chanceAt(cells, lat, lon) {
+    if (!finite(lat) || !finite(lon)) return 0;
+    var best = 0;
+    (cells || []).forEach(function (c) {
+      var dlon = Math.abs(((c[0] - lon + 540) % 360) - 180);
+      if (Math.abs(c[1] - lat) <= 1 && dlon <= 1 && c[2] > best) best = c[2];
+    });
+    return best;
+  }
+
+  function latLonText(lat, lon) {
+    return Math.abs(lat).toFixed(1) + (lat >= 0 ? ' N' : ' S') + ', ' +
+      Math.abs(lon).toFixed(1) + (lon >= 0 ? ' E' : ' W');
+  }
+
   function withCommas(n) {
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
@@ -216,7 +233,7 @@
     var api = ctx.api || '';
     var m = {
       enabled: false, min: DEFAULT_MIN, layer: null, timer: null, seq: 0, count: 0,
-      lastLine: '', failed: false, staticNoted: false, root: null, statusEl: null,
+      lastLine: '', failed: false, cells: [], data: null, staticNoted: false, root: null, statusEl: null,
       minSelect: null
     };
 
@@ -331,7 +348,10 @@
             height: HEIGHT_M,
             vertexFormat: C.EllipsoidSurfaceAppearance.VERTEX_FORMAT
           }),
-          id: { type: 'aurora', hemisphere: band.north ? 'north' : 'south' }
+          // sdaBackground: the page's click handler looks under the oval first, so
+          // an aircraft or a quake beneath it still opens its own card.
+          id: { type: 'aurora', hemisphere: band.north ? 'north' : 'south', sdaBackground: true,
+                sdaPick: function (pos) { describeAt(band.north, pos); } }
         }),
         // flat: aurora is its own light. With sun shading the oval would go dark
         // in the polar night, which is exactly when and where it is seen.
@@ -350,6 +370,37 @@
         }),
         asynchronous: false
       });
+    }
+
+    // What a click on the oval says: the chance under the cursor and the forecast.
+    function describeAt(north, pos) {
+      var lat = null;
+      var lon = null;
+      try {
+        var hit = pos ? viewer.camera.pickEllipsoid(pos, viewer.scene.globe.ellipsoid) : null;
+        if (hit) {
+          var g = C.Cartographic.fromCartesian(hit);
+          lat = g.latitude * 180 / Math.PI;
+          lon = g.longitude * 180 / Math.PI;
+        }
+      } catch (e) { lat = null; }
+      var h = hemisphereMax(m.data, m.cells);
+      var rows = [];
+      if (lat !== null) {
+        var p = chanceAt(m.cells, lat, lon);
+        rows.push(['CHANCE HERE', p > 0 ? Math.round(p) + '%' : 'under ' + m.min + '%']);
+        rows.push(['POSITION', latLonText(lat, lon)]);
+      }
+      rows.push(['MAX ' + (north ? 'NORTH' : 'SOUTH'), Math.round(north ? h.north : h.south) + '%']);
+      var t = shortTime(m.data && m.data.forecast_time);
+      if (t) rows.push(['FORECAST', t]);
+      rows.push(['MEANING', 'Chance of aurora overhead in the next 30 to 90 minutes']);
+      rows.push(['SOURCE', 'NOAA SWPC OVATION']);
+      var card = { name: 'Aurora oval, ' + (north ? 'northern' : 'southern') + ' hemisphere',
+                   type: 'aurora forecast', rows: rows };
+      if (typeof ctx.showInfoCard === 'function') ctx.showInfoCard(card);
+      else note(card.name + ': ' + rows.map(function (r) { return r[0] + ' ' + r[1]; }).join(', '));
+      return card;
     }
 
     function draw(cells) {
@@ -378,6 +429,8 @@
       }).then(function (data) {
         if (seq !== m.seq || !m.enabled) return null;
         var cells = cleanCells(data && data.cells, min);
+        m.cells = cells;
+        m.data = data;
         var drawn = draw(cells);
         m.failed = false;
         var line = intelLine(data, cells, min);
@@ -437,6 +490,7 @@
     m.setEnabled = setEnabled;
     m.setMin = setMin;
     m.load = load;
+    m.describeAt = describeAt;
     return m;
   }
 
@@ -475,6 +529,8 @@
     rasterBand: rasterBand,
     hemisphereMax: hemisphereMax,
     intelLine: intelLine,
+    chanceAt: chanceAt,
+    describeAt: function (north, pos) { return current ? current.describeAt(north, pos) : null; },
     shortTime: shortTime
   };
 })(typeof window !== 'undefined' ? window : this);

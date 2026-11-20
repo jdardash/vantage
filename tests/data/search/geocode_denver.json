@@ -1,0 +1,23 @@
+{
+ "results": [
+  {
+   "name": "Denver, Colorado, United States",
+   "type": "city",
+   "lat": 39.7392364,
+   "lon": -104.984862
+  },
+  {
+   "name": "Denver International Airport, Denver, Colorado, United States",
+   "type": "aerodrome",
+   "lat": 39.8493,
+   "lon": -104.6738
+  },
+  {
+   "name": "Denver, Lincoln County, North Carolina, United States",
+   "type": "village",
+   "lat": 35.5312,
+   "lon": -81.0298
+  }
+ ],
+ "count": 3
+}

@@ -102,6 +102,9 @@ STATIC_CONTENT_TYPES: dict[str, str] = {
     ".png": "image/png",
     ".ico": "image/vnd.microsoft.icon",
     ".txt": "text/plain; charset=utf-8",
+    # the 3D aircraft, ship and spacecraft models (static/models, from
+    # scripts/build_globe_models.py); without this every model answered 404
+    ".glb": "model/gltf-binary",
 }
 
 
@@ -532,14 +535,26 @@ async def tle_catalog(
     tags=["WorldView"],
     summary="Orbit paths for all tracked satellites",
 )
-def satellite_orbits():
-    """Return one-orbit path for each tracked satellite as lat/lon/alt arrays."""
+def satellite_orbits(
+    limit: int = Query(
+        200, ge=1, le=1000,
+        description="Most orbits to return, in catalog order. The globe asks for 200 and "
+        "draws at most 150 of those in view.",
+    ),
+):
+    """Return one-orbit path for up to ``limit`` tracked satellites as lat/lon/alt arrays.
+
+    The page always sent ``limit=200`` but the route ignored it and walked the whole
+    catalog: 32,878 objects at 100 points each took over two minutes, held a
+    browser connection the whole time and starved the camera, peak and
+    infrastructure layers of theirs (found by the click audit, 2026-11-20).
+    """
     from sda.api import store
 
     now = datetime.now(UTC)
     orbits = []
 
-    for tle in store.get_all():
+    for tle in store.get_all()[:limit]:
         try:
             satrec = build_satrec(tle)
             n_rad_min = satrec.no_kozai
@@ -638,33 +653,62 @@ def reset_opensky_token() -> None:
     _OPENSKY_TOKEN = None
 
 
+#: OpenSky's anonymous feed moves on every 10 s, so one upstream answer serves every
+#: caller inside that window. A slow answer is cut off at the deadline instead of
+#: holding a browser connection: the all-layers click audit of 2026-11-20 saw one
+#: take 72 s while the camera, peak and infrastructure layers queued behind it.
+FLIGHTS_TTL_S = 10.0
+FLIGHTS_DEADLINE_S = 20.0
+#: How old a last good answer may be and still stand in for a failed fetch.
+FLIGHTS_STALE_MAX_S = 300.0
+_FLIGHTS_CACHE: tuple[float, dict[str, Any]] | None = None
+
+
+def reset_flights_cache() -> None:
+    """Forget the last OpenSky answer. Used by the tests."""
+    global _FLIGHTS_CACHE
+    _FLIGHTS_CACHE = None
+
+
+async def _fetch_opensky_states(token: str | None) -> tuple[int, Any]:
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
+        resp = await client.get(OPENSKY_STATES_URL)
+        return resp.status_code, (resp.json() if resp.status_code == 200 else None)
+
+
 @router.get("/api/flights", tags=["WorldView"], summary="Live flight data from OpenSky Network")
 async def proxy_flights():
     """Proxy live aircraft positions from OpenSky Network for globe display.
 
     Authenticated when OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET are set,
     anonymous otherwise. The anonymous path stays the default so a fresh
-    checkout still shows aircraft.
+    checkout still shows aircraft. Answers are held for FLIGHTS_TTL_S, and a
+    fetch that fails or runs past FLIGHTS_DEADLINE_S falls back to the last
+    good answer (marked ``stale``) when there is one under five minutes old.
     """
+    global _FLIGHTS_CACHE
+    now = time.monotonic()
+    if _FLIGHTS_CACHE is not None and now - _FLIGHTS_CACHE[0] < FLIGHTS_TTL_S:
+        return _FLIGHTS_CACHE[1]
+
     token = await _opensky_token()
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    error: str | None = None
+    data: Any = None
     try:
-        async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
-            resp = await client.get(OPENSKY_STATES_URL)
-            if resp.status_code != 200:
-                return {
-                    "flights": [],
-                    "count": 0,
-                    "authenticated": bool(token),
-                    "error": "OpenSky unavailable",
-                }
-            data = resp.json()
+        status, data = await asyncio.wait_for(_fetch_opensky_states(token), FLIGHTS_DEADLINE_S)
+        if status != 200:
+            error = "OpenSky unavailable"
     except Exception:
+        error = "OpenSky request failed"
+    if error is not None or not isinstance(data, dict):
+        if _FLIGHTS_CACHE is not None and now - _FLIGHTS_CACHE[0] < FLIGHTS_STALE_MAX_S:
+            return {**_FLIGHTS_CACHE[1], "stale": True}
         return {
             "flights": [],
             "count": 0,
             "authenticated": bool(token),
-            "error": "OpenSky request failed",
+            "error": error or "OpenSky request failed",
         }
 
     flights = []
@@ -685,12 +729,14 @@ async def proxy_flights():
             "is_military": False,
         })
 
-    return {
+    result = {
         "flights": flights,
         "count": len(flights),
         "authenticated": bool(token),
         "timestamp": data.get("time"),
     }
+    _FLIGHTS_CACHE = (time.monotonic(), result)
+    return result
 
 
 @router.get("/api/earthquakes", tags=["WorldView"], summary="Recent seismic activity from USGS")
@@ -773,15 +819,17 @@ def worldview_config():
     summary="Live military aircraft from crowdsourced ADS-B (adsb.lol)",
 )
 async def proxy_military_flights():
-    """Proxy military aircraft positions from the adsb.lol /v2/mil feed."""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get("https://api.adsb.lol/v2/mil")
-            if resp.status_code != 200:
-                return {"flights": [], "count": 0, "error": "adsb.lol unavailable"}
-            data = resp.json()
-    except Exception:
-        return {"flights": [], "count": 0, "error": "adsb.lol request failed"}
+    """Proxy military aircraft positions from the adsb.lol /v2/mil feed.
+
+    The request goes through sda.aviation, which meters adsb.lol's 500-a-day
+    per-IP allowance for every caller on this server and caches each path for a
+    minute, so this layer and the aviation overlay never spend it twice.
+    """
+    from sda import aviation
+
+    data = await aviation.fetch_v2("/v2/mil", purpose="military flights layer")
+    if not isinstance(data, dict):
+        return {"flights": [], "count": 0, "error": "adsb.lol unavailable"}
 
     flights = []
     for ac in (data.get("ac") or [])[:500]:
@@ -1017,9 +1065,11 @@ async def proxy_geocode(
     q: str = Query(..., min_length=2, max_length=200, description="Free-text place query"),
 ):
     """Proxy place-name search to Nominatim for the WorldView search box."""
+    # English names where OSM has them: without it Mount Everest comes back as
+    # its Chinese and Tibetan name, which no Latin query matches.
     url = (
         "https://nominatim.openstreetmap.org/search"
-        "?format=jsonv2&limit=8&q=" + quote(q)
+        "?format=jsonv2&limit=8&accept-language=en&q=" + quote(q)
     )
     headers = {"User-Agent": "vantage/0.2 (worldview geocoder)"}
 
@@ -1040,11 +1090,19 @@ async def proxy_geocode(
                 "type": row.get("type") or row.get("category") or "place",
                 "lat": float(row["lat"]),
                 "lon": float(row["lon"]),
+                # Nominatim's 0 to 1 prominence of the place; None when absent.
+                "importance": _finite_or_none(row.get("importance")),
             })
         except (KeyError, TypeError, ValueError):
             continue
 
     return {"results": results, "count": len(results)}
+
+
+def _finite_or_none(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if math.isfinite(value) else None
 
 
 #: Reverse geocoding: Nominatim asks for at most one request a second and a
@@ -1789,7 +1847,9 @@ async def proxy_volcanoes() -> dict:
 # Keyless layer: active US weather alerts (NWS)
 # ---------------------------------------------------------------------------
 
-_NWS_ALERTS_URL = "https://api.weather.gov/alerts/active?status=actual&limit=200"
+# No limit parameter: since 2026-11 api.weather.gov answers HTTP 400 "Query parameter
+# limit is not recognized" on this endpoint. The handler caps the features it keeps.
+_NWS_ALERTS_URL = "https://api.weather.gov/alerts/active?status=actual"
 WEATHER_ALERT_CACHE_TTL_S = 180.0
 
 #: NWS severity -> a colour the client can use without a second lookup.
@@ -1884,67 +1944,111 @@ async def proxy_weather_alerts() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Keyless layer: GDELT GEO 2.1 recent events
+# Keyless layer: GDELT 2.0 event export, grouped by place
 # ---------------------------------------------------------------------------
+# The GEO 2.0 API this layer used to call (api.gdeltproject.org/api/v2/geo/geo)
+# answers 404 since 2026-11. The 15-minute event export is read and cached by
+# sda.intel; this route only groups its rows by place.
 
-_GDELT_URL = (
-    "https://api.gdeltproject.org/api/v2/geo/geo"
-    "?query={query}&format=GeoJSON&mode=PointData&timespan={timespan}"
-)
-GDELT_CACHE_TTL_S = 600.0
+GDELT_CACHE_TTL_S = 120.0
+GDELT_SLOT_MINUTES = 15
 _GDELT_MAX_QUERY = 120
+_GDELT_MAX_PLACES = 400
+
+
+def gdelt_places(rows: list[dict], query: str = "", limit: int = _GDELT_MAX_PLACES) -> list[dict]:
+    """Group located GDELT events by place, busiest first.
+
+    ``count`` is the summed article count at the place (an event with no
+    article count weighs 1), not a severity. ``tone`` is the article-weighted
+    mean tone. ``event`` is the commonest CAMEO root at the place, and
+    ``source_url`` is the most-cited event's article. ``query`` keeps only
+    events whose place or event label contains it, case-insensitively.
+    """
+    needle = query.strip().lower()
+    groups: dict[tuple[float, float, str], dict] = {}
+    for r in rows:
+        place = str(r.get("place") or "")
+        label = str(r.get("event") or "")
+        if needle and needle not in place.lower() and needle not in label.lower():
+            continue
+        try:
+            lat = float(r["lat"])
+            lon = float(r["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        weight = max(1, int(r.get("articles") or 0))
+        key = (round(lat, 3), round(lon, 3), place)
+        g = groups.get(key)
+        if g is None:
+            g = groups[key] = {
+                "name": place, "lat": lat, "lon": lon, "count": 0, "events": 0,
+                "conflict": 0, "_tone": 0.0, "_labels": {}, "_best": -1,
+                "source_url": "", "date": "",
+            }
+        g["count"] += weight
+        g["events"] += 1
+        g["_tone"] += float(r.get("tone") or 0.0) * weight
+        if r.get("quad_class") in (3, 4):
+            g["conflict"] += 1
+        if label:
+            g["_labels"][label] = g["_labels"].get(label, 0) + 1
+        url = str(r.get("source_url") or "")
+        if url and weight > g["_best"]:
+            g["_best"] = weight
+            g["source_url"] = url
+        date = str(r.get("date") or "")
+        if date > g["date"]:
+            g["date"] = date
+
+    out: list[dict] = []
+    for g in groups.values():
+        labels: dict[str, int] = g.pop("_labels")
+        g["event"] = max(labels, key=lambda k: (labels[k], k)) if labels else ""
+        g["tone"] = round(g.pop("_tone") / g["count"], 2)
+        g.pop("_best")
+        out.append(g)
+    out.sort(key=lambda g: (-g["count"], -g["events"], g["name"]))
+    return out[:limit]
 
 
 @router.get(
     "/api/gdelt",
     tags=["WorldView"],
-    summary="Geolocated news events from the GDELT GEO 2.1 API",
+    summary="Geolocated news events from the GDELT 2.0 event export, grouped by place",
 )
 async def proxy_gdelt(
-    q: str = Query(default="satellite", min_length=2, max_length=_GDELT_MAX_QUERY),
-    timespan: str = Query(default="24H", pattern=r"^\d{1,3}[HD]$"),
+    q: str = Query(default="", max_length=_GDELT_MAX_QUERY),
+    minutes: int = Query(default=60, ge=GDELT_SLOT_MINUTES, le=120),
 ) -> dict:
-    """Recent geolocated news mentions as globe points.
+    """Places in the news over the last ``minutes``, as globe points.
 
-    Source: GDELT Project GEO 2.1 API, keyless. ``count`` on each point is how
-    many articles GDELT clustered at that place, not an event severity.
+    Source: GDELT Project 2.0 event export (15-minute files), keyless. Actor
+    names are dropped upstream in sda.intel because they can name people.
     """
+    from sda import intel  # imported here: sda.intel imports this module
+
     query = q.strip()
-    cache_key = f"gdelt:{query.lower()}:{timespan.upper()}"
+    slots = max(1, minutes // GDELT_SLOT_MINUTES)
+    cache_key = f"gdelt:{query.lower()}:{slots}"
     cached = _cache_get(cache_key, GDELT_CACHE_TTL_S)
     if cached is not None:
         return cached
 
-    url = _GDELT_URL.format(query=quote(query), timespan=timespan.upper())
-    data = await _get_json(url, timeout_s=15.0, purpose="gdelt")
-    if not isinstance(data, dict):
+    rows = await intel.fetch_gdelt_events(max_age_slots=slots)
+    if not rows:
         return {"events": [], "count": 0, "query": query, "error": "GDELT unavailable"}
 
-    rows: list[dict] = []
-    for feature in (data.get("features") or [])[:400]:
-        geometry = (feature or {}).get("geometry") or {}
-        coords = geometry.get("coordinates")
-        if not isinstance(coords, list) or len(coords) < 2:
-            continue
-        props = feature.get("properties") or {}
-        try:
-            lon = float(coords[0])
-            lat = float(coords[1])
-        except (TypeError, ValueError):
-            continue
-        rows.append({
-            "name": props.get("name") or "",
-            "count": props.get("count") or 0,
-            "lat": lat,
-            "lon": lon,
-        })
-
+    places = gdelt_places(rows, query)
+    status = intel.gdelt_status()
     return _cache_put(cache_key, {
-        "events": rows,
-        "count": len(rows),
+        "events": places,
+        "count": len(places),
+        "raw_events": len(rows),
         "query": query,
-        "timespan": timespan.upper(),
-        "source": "GDELT Project GEO 2.1",
+        "minutes": slots * GDELT_SLOT_MINUTES,
+        "newest": status.get("newest", ""),
+        "source": "GDELT Project 2.0 event export",
     })
 
 

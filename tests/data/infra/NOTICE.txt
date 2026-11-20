@@ -1,0 +1,21 @@
+Test fixtures for tests/test_infra.py.
+
+Recorded samples (a few rows each, cut on 2026-11-19):
+  wri_sample.csv            WRI Global Power Plant Database v1.3, CC BY 4.0
+                            (the last row is a copy with its latitude removed)
+  airports_sample.csv       OurAirports airports.csv, public domain
+  wpi_arcgis_sample.json    NGA World Port Index (Pub 150) via the ArcGIS layer UpdatedPub150,
+                            public domain
+  wpi_nga_sample.csv        the same rows written with the NGA CSV column names, plus one
+                            row without a WPI number
+  wikidata_dams_sample.csv  Wikidata query service answer, CC0; the four Q9999999xx rows are
+                            synthetic (levee, weir, splash dam, bad position)
+  peeringdb_fac_sample.json PeeringDB /api/fac, four facilities
+  bfs_odl_sample.json       BfS ODL-Info WFS opendata:odlinfo_odl_1h_latest, dl-de/by-2-0
+
+Synthetic (made up, same shape as the real answers):
+  cable_geo_sample.json, landing_geo_sample.json, cable_details_sample.json
+      TeleGeography's map data is CC BY-NC-SA, so none of it is committed here.
+  safecast_sample.json
+      Safecast device list shape; the contact fields hold placeholder values so the
+      tests can prove they are never copied.

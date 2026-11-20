@@ -9,6 +9,7 @@ network calls ever happen.
 import asyncio
 import re
 import time
+from pathlib import Path
 
 import httpx
 import pytest
@@ -542,6 +543,20 @@ def test_static_serves_the_manifest_with_its_own_media_type():
     assert resp.headers["content-type"].startswith("application/manifest+json")
 
 
+def test_static_serves_every_globe_model():
+    """models.js asks for these by name; until 2026-11-19 the route refused .glb and
+    every aircraft, ship and spacecraft model answered 404 in the browser."""
+    root = Path(__file__).resolve().parent.parent
+    models = root / "src" / "sda" / "templates" / "static" / "models"
+    names = sorted(f.name for f in models.glob("*.glb"))
+    assert {"iss.glb", "satellite.glb", "airplane.glb", "ship_tanker.glb"} <= set(names)
+    for name in names:
+        resp = client.get(f"/static/models/{name}")
+        assert resp.status_code == 200, name
+        assert resp.headers["content-type"] == "model/gltf-binary"
+        assert resp.content[:4] == b"glTF"
+
+
 def test_static_rejects_directory_traversal():
     """A path escaping the static root must 404, not leak a source file."""
     for attempt in (
@@ -1073,3 +1088,93 @@ def test_globe_storm_level_counts_kp_five_minus_as_g1():
     assert [_g_scale(k) for k in (None, 4.33, 4.67, 5.0, 5.67, 7.67, 8.67, 9.0)] == [
         "", "G0", "G1", "G1", "G2", "G4", "G4", "G5",
     ]
+
+
+def test_satellite_orbits_honours_the_limit_the_globe_sends(process_catalog_restored):
+    """The page asks for 200; walking all 32,878 objects took over two minutes."""
+    from sda.api import store
+
+    iss = (
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   26323.50000000  .00016717  00000-0  10270-3 0  9002\n"
+        "2 25544  51.6400 208.9163 0006317  69.9862 290.2122 15.50000000    09\n"
+    )
+    store._catalog.clear()
+    store.load_from_text(iss)
+    base = next(iter(store._catalog.values()))
+    for k in range(1, 6):
+        store._catalog[90000 + k] = base.model_copy(update={"norad_id": 90000 + k})
+    body = client.get("/api/satellite-orbits?limit=3").json()
+    assert body["count"] == 3
+    assert [o["norad_id"] for o in body["orbits"]] == [25544, 90001, 90002]
+    first = body["orbits"][0]
+    assert 80 < first["period_min"] < 100 and len(first["path"]) >= 50
+    assert all(300 < pt["alt_km"] < 500 for pt in first["path"])
+    assert client.get("/api/satellite-orbits").json()["count"] == 6  # default 200
+    assert client.get("/api/satellite-orbits?limit=0").status_code == 422
+    assert client.get("/api/satellite-orbits?limit=1001").status_code == 422
+
+
+# --- /api/flights ---
+
+STATE_ROW = ["3c6444", "DLH4AB ", "Germany", 0, 0, 8.55, 50.03, 10500.0, False, 230.0, 90.0,
+             0, None, 10600.0, "1000", False, 0]
+
+
+@pytest.fixture
+def flights_reset(monkeypatch):
+    monkeypatch.delenv("OPENSKY_CLIENT_ID", raising=False)
+    monkeypatch.delenv("OPENSKY_CLIENT_SECRET", raising=False)
+    wv.reset_flights_cache()
+    yield
+    wv.reset_flights_cache()
+
+
+def test_flights_maps_states_and_holds_them_for_ten_seconds(monkeypatch, flights_reset):
+    calls = []
+
+    def handler(url):
+        calls.append(url)
+        return FakeResponse(200, {"time": 1763600000, "states": [STATE_ROW, [None] * 17]})
+
+    patch_get(monkeypatch, handler)
+    first = client.get("/api/flights").json()
+    assert first["count"] == 1 and first["authenticated"] is False
+    f = first["flights"][0]
+    assert (f["icao24"], f["callsign"], f["lat"], f["lon"], f["alt_m"]) == (
+        "3c6444", "DLH4AB", 50.03, 8.55, 10500.0)
+    assert client.get("/api/flights").json() == first
+    assert len(calls) == 1  # the second caller inside the window did not go upstream
+
+
+def test_flights_falls_back_to_the_last_good_answer(monkeypatch, flights_reset):
+    patch_get(monkeypatch, lambda url: FakeResponse(200, {"time": 1, "states": [STATE_ROW]}))
+    good = client.get("/api/flights").json()
+    when, payload = wv._FLIGHTS_CACHE
+    wv._FLIGHTS_CACHE = (when - wv.FLIGHTS_TTL_S - 1, payload)  # past the window
+    patch_get(monkeypatch, _raise)
+    stale = client.get("/api/flights").json()
+    assert stale["stale"] is True and stale["flights"] == good["flights"]
+    wv._FLIGHTS_CACHE = (when - wv.FLIGHTS_STALE_MAX_S - 1, payload)  # too old to stand in
+    assert client.get("/api/flights").json()["error"] == "OpenSky request failed"
+
+
+def test_flights_upstream_refusal_without_a_copy(monkeypatch, flights_reset):
+    patch_get(monkeypatch, lambda url: FakeResponse(503, None))
+    body = client.get("/api/flights").json()
+    assert body == {"flights": [], "count": 0, "authenticated": False,
+                    "error": "OpenSky unavailable"}
+    assert wv._FLIGHTS_CACHE is None  # a refusal is never cached
+
+
+def test_flights_slow_upstream_is_cut_off_at_the_deadline(monkeypatch, flights_reset):
+    async def slow(token):
+        await asyncio.sleep(5)
+        return 200, {"states": []}
+
+    monkeypatch.setattr(wv, "_fetch_opensky_states", slow)
+    monkeypatch.setattr(wv, "FLIGHTS_DEADLINE_S", 0.05)
+    started = time.monotonic()
+    body = client.get("/api/flights").json()
+    assert time.monotonic() - started < 2
+    assert body["error"] == "OpenSky request failed" and body["flights"] == []

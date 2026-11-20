@@ -63,6 +63,22 @@
     { key: 'Neptune', label: 'Neptune', color: '#7ea8ff', size: 5 }
   ];
 
+  /** What each body is, for the card a click opens (NASA planetary fact sheets). */
+  var BODY_FACTS = {
+    Sun: { kind: 'Star', fact: 'G-type main-sequence star, about 1.39 million km across' },
+    Moon: { kind: 'Moon of Earth', fact: '3,475 km across, goes round Earth every 27.3 days' },
+    Mercury: { kind: 'Planet', fact: 'Rocky, 4,879 km across, a year of 88 days' },
+    Venus: { kind: 'Planet', fact: 'Rocky, 12,104 km across, a year of 225 days' },
+    Mars: { kind: 'Planet', fact: 'Rocky, 6,792 km across, a year of 687 days' },
+    Jupiter: { kind: 'Planet', fact: 'Gas giant, 142,984 km across, a year of 11.9 years' },
+    Saturn: { kind: 'Planet', fact: 'Gas giant, 120,536 km across, a year of 29.4 years' },
+    Uranus: { kind: 'Planet', fact: 'Ice giant, 51,118 km across, a year of 84 years' },
+    Neptune: { kind: 'Planet', fact: 'Ice giant, 49,528 km across, a year of 165 years' }
+  };
+
+  var AU_KM = 149597870.7;
+  var LIGHT_MIN_PER_AU = 8.3167;
+
   var COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
@@ -201,18 +217,53 @@
   /**
    * The labelled object nearest the view direction, within maxDeg, or null.
    * targets: [{name, enu, kind, priority}], a lower priority wins a near tie.
+   * A near tie is 5% of the reach per priority step. It was a flat half degree
+   * a step, which let a satellite a degree off take a click made dead on a
+   * star (Betelgeuse answered as GEESAT 6-03 in a browser check, 2026-11-20).
    */
   function nearestTarget(targets, dirEnu, maxDeg) {
     var best = null;
     var bestScore = Infinity;
+    var step = 0.05 * (maxDeg || 0);
     (targets || []).forEach(function (t) {
       if (!t || !t.enu) return;
       var a = angleDeg(t.enu, dirEnu);
       if (a > maxDeg) return;
-      var score = a + (t.priority || 0) * 0.5;
-      if (score < bestScore) { bestScore = score; best = { name: t.name, kind: t.kind, angle: a }; }
+      var score = a + (t.priority || 0) * step;
+      if (score < bestScore) { bestScore = score; best = { name: t.name, kind: t.kind, angle: a, target: t }; }
     });
     return best;
+  }
+
+  /**
+   * ENU unit vector under a pixel for the sky camera: aimed at (az, el), vertical
+   * field of view fovy, dx and dy in pixels from the canvas centre (y grows down).
+   * applyCamera builds the same pinhole from enuDirection and levelBasis.
+   */
+  function screenDirection(azDeg, elDeg, fovyDeg, dx, dy, heightPx) {
+    var f = enuDirection(azDeg, elDeg);
+    var b = levelBasis(azDeg, elDeg);
+    var k = Math.tan(fovyDeg * D2R / 2) / Math.max(1, heightPx / 2);
+    var v = [0, 1, 2].map(function (i) { return f[i] + b.right[i] * dx * k - b.up[i] * dy * k; });
+    var len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
+    return [v[0] / len, v[1] / len, v[2] / len];
+  }
+
+  /** Right ascension (hours) and declination (degrees) of a J2000 unit vector. */
+  function raDecOf(v) {
+    var ra = Math.atan2(v[1], v[0]) * R2D / 15;
+    if (ra < 0) ra += 24;
+    return { ra: ra, dec: Math.asin(Math.max(-1, Math.min(1, v[2]))) * R2D };
+  }
+
+  /** "14:05 UTC, in 3 h 20 min" for a time after now, "14:05 UTC" otherwise. */
+  function whenText(date, now) {
+    if (!date || !isFinite(date.getTime())) return '--';
+    var hhmm = date.toISOString().slice(11, 16) + ' UTC';
+    var mins = Math.round((date.getTime() - now.getTime()) / 60000);
+    if (mins <= 0) return hhmm;
+    var h = Math.floor(mins / 60);
+    return hhmm + ', in ' + (h ? h + ' h ' : '') + (mins % 60) + ' min';
   }
 
   function fmt(n, digits) {
@@ -282,6 +333,21 @@
     '  color: var(--hud-color, #ffb000); font: inherit; font-size: 9px; padding: 2px 7px;',
     '  border-radius: 2px; cursor: pointer; }',
     '.sky-hud button.on { background: rgba(255,176,0,0.18); }',
+    '.sky-card { position: fixed; z-index: 46; display: none; width: 270px; padding: 8px 10px;',
+    '  background: rgba(0,0,0,0.86); border: 1px solid rgba(255,176,0,0.55); border-radius: 4px;',
+    '  font-size: 10px; color: var(--hud-color, #ffb000); }',
+    '.sky-card .sky-card-title { font-size: 13px; font-weight: 700; color: #fff; margin-right: 18px; }',
+    '.sky-card .sky-card-kind { color: var(--hud-dim, #7a5500); letter-spacing: 1px;',
+    '  text-transform: uppercase; margin: 2px 0 6px; }',
+    '.sky-card .sky-card-fact { color: #cfe3ff; margin-bottom: 6px; line-height: 1.35; }',
+    '.sky-card .sky-card-row { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }',
+    '.sky-card .sky-card-row span:first-child { color: var(--hud-dim, #7a5500); }',
+    '.sky-card .sky-card-row span:last-child { text-align: right; }',
+    '.sky-card .sky-card-x { position: absolute; right: 6px; top: 4px; background: none; border: 0;',
+    '  color: var(--hud-color, #ffb000); font: inherit; font-size: 13px; cursor: pointer; }',
+    '.sky-card .sky-card-act { margin-top: 6px; width: 100%; background: none; font: inherit;',
+    '  border: 1px solid rgba(255,176,0,0.4); color: var(--hud-color, #ffb000); padding: 3px;',
+    '  cursor: pointer; font-size: 9px; letter-spacing: 1px; }',
     'body.sky-active #cesiumContainer canvas { cursor: grab; }'
   ].join('\n');
 
@@ -334,7 +400,8 @@
     body.appendChild(el('div', 'sky-note',
       'Stand anywhere on Earth and look up: stars, constellations, the Sun, Moon and ' +
       'planets where they are now, and the satellites passing overhead. Drag to look ' +
-      'around, scroll to zoom, Esc to come back.'));
+      'around, click any star, planet or satellite to see what it is, scroll to zoom, ' +
+      'Esc to come back.'));
     var row1 = el('div', 'sky-row');
     m.hereBtn = button('mode-btn', 'LOOK UP HERE', 'Sky above the centre of the view');
     m.pickBtn = button('mode-btn', 'PICK A SPOT', 'Click the globe to choose where to stand');
@@ -373,6 +440,145 @@
       function (n) { m.hud.appendChild(n); });
     global.document.body.appendChild(m.reticle);
     global.document.body.appendChild(m.hud);
+
+    // -- card for whatever a click lands on ---------------------------------
+
+    m.card = el('div', 'sky-card');
+    m.card.setAttribute('role', 'dialog');
+    m.card.setAttribute('aria-label', 'Sky object');
+    global.document.body.appendChild(m.card);
+
+    function hideCard() {
+      m.card.style.display = 'none';
+      m.card.textContent = '';
+      m.cardInfo = null;
+    }
+
+    /** Title, kind, fact and rows for a hit from nearestTarget, at the sky clock. */
+    function describe(hit) {
+      var A = m.astro;
+      var t = hit.target || {};
+      var date = C.JulianDate.toDate(viewer.clock.currentTime);
+      var obs = new A.Observer(m.observer.lat, m.observer.lon, 0);
+      var ae = azElOf(t.enu);
+      var info = { title: hit.name, kind: '', fact: '', rows: [], norad: null };
+      function row(label, fn) {
+        try {
+          var v = fn();
+          if (v !== null && v !== undefined && v !== '') info.rows.push([label, String(v)]);
+        } catch (e) { /* a row astronomy-engine cannot answer is left out */ }
+      }
+      function constellation(raH, decD) { return A.Constellation(raH, decD).name; }
+      row('Position', function () {
+        return 'alt ' + fmt(ae.el, 1) + ' deg, az ' + fmt(ae.az, 0) + ' ' + compassPoint(ae.az);
+      });
+      if (t.kind === 'body') {
+        var facts = BODY_FACTS[t.key] || {};
+        var body = A.Body[t.key];
+        info.title = t.key;
+        info.kind = facts.kind || 'Solar system body';
+        info.fact = facts.fact || '';
+        var eq = null;
+        try { eq = A.Equator(body, date, obs, false, true); } catch (e) { eq = null; }
+        if (t.key === 'Moon') {
+          row('Phase', function () { return moonPhaseName(A.MoonPhase(date)); });
+        }
+        if (t.key !== 'Sun') {
+          row('Lit', function () { return Math.round(A.Illumination(body, date).phase_fraction * 100) + '%'; });
+        }
+        row('Brightness', function () {
+          var mag = A.Illumination(body, date).mag;
+          return isFinite(mag) ? 'magnitude ' + (mag >= 0 ? '+' : '') + fmt(mag, 1) : null;
+        });
+        row('Distance', function () {
+          if (!eq || !isFinite(eq.dist)) return null;
+          if (t.key === 'Moon') return Math.round(eq.dist * AU_KM).toLocaleString('en-US') + ' km';
+          return fmt(eq.dist, 3) + ' AU, light takes ' + fmt(eq.dist * LIGHT_MIN_PER_AU, 1) + ' min';
+        });
+        row('In', function () { return eq ? constellation(eq.ra, eq.dec) : null; });
+        row('Rises', function () {
+          var r = A.SearchRiseSet(body, obs, +1, date, 2);
+          return r ? whenText(r.date, date) : 'not in the next 2 days';
+        });
+        row('Sets', function () {
+          var s = A.SearchRiseSet(body, obs, -1, date, 2);
+          return s ? whenText(s.date, date) : 'not in the next 2 days';
+        });
+        if (t.key === 'Sun') row('Sky', function () { return skyState(ae.el); });
+      } else if (t.kind === 'star') {
+        info.kind = 'Star';
+        info.fact = t.mag <= 1.5 ? 'One of the brightest stars in the sky' :
+          'Visible to the naked eye under a dark sky';
+        row('Brightness', function () { return 'magnitude ' + (t.mag >= 0 ? '+' : '') + fmt(t.mag, 2); });
+        row('In', function () { var rd = raDecOf(t.v); return constellation(rd.ra, rd.dec); });
+        row('RA / Dec', function () {
+          var rd = raDecOf(t.v);
+          return fmt(rd.ra, 2) + ' h / ' + (rd.dec >= 0 ? '+' : '') + fmt(rd.dec, 1) + ' deg';
+        });
+      } else if (t.kind === 'constellation') {
+        info.kind = 'Constellation';
+        info.fact = 'One of the 88 constellations recognised by the IAU';
+      } else if (t.kind === 'satellite') {
+        info.title = t.label || hit.name;
+        info.kind = 'Satellite overhead';
+        info.norad = t.norad != null ? t.norad : null;
+        row('NORAD', function () { return t.norad; });
+        row('Range', function () { return isFinite(t.range) ? Math.round(t.range / 1000) + ' km' : null; });
+      }
+      return info;
+    }
+
+    function showCard(info, x, y) {
+      var card = m.card;
+      card.textContent = '';
+      var close = el('button', 'sky-card-x', 'x');
+      close.setAttribute('type', 'button');
+      close.setAttribute('aria-label', 'Close');
+      close.addEventListener('click', hideCard);
+      card.appendChild(close);
+      card.appendChild(el('div', 'sky-card-title', info.title));
+      card.appendChild(el('div', 'sky-card-kind', info.kind));
+      if (info.fact) card.appendChild(el('div', 'sky-card-fact', info.fact));
+      info.rows.forEach(function (r) {
+        var line = el('div', 'sky-card-row');
+        line.appendChild(el('span', null, r[0]));
+        line.appendChild(el('span', null, r[1]));
+        card.appendChild(line);
+      });
+      if (info.norad != null && typeof ctx.selectSatellite === 'function') {
+        var open = el('button', 'sky-card-act', 'OPEN SATELLITE CARD');
+        open.setAttribute('type', 'button');
+        open.addEventListener('click', function () {
+          try { ctx.selectSatellite(info.norad); } catch (e) { /* keep going */ }
+        });
+        card.appendChild(open);
+      }
+      var vw = global.innerWidth || 1600;
+      var vh = global.innerHeight || 900;
+      card.style.left = Math.max(8, Math.min(x + 16, vw - 290)) + 'px';
+      card.style.top = Math.max(8, Math.min(y + 16, vh - 260)) + 'px';
+      card.style.display = 'block';
+      m.cardInfo = info;
+    }
+
+    /** What sits under a click in the sky, as a card; null when nothing is near. */
+    function identifyAt(clientX, clientY) {
+      if (!m.active || !m.astro || !isFinite(clientX) || !isFinite(clientY)) return null;
+      var canvas = viewer.canvas;
+      var r = null;
+      try { r = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : null; } catch (e) { r = null; }
+      var w = canvas.clientWidth || 1;
+      var h = canvas.clientHeight || 1;
+      var dx = clientX - ((r && r.left) || 0) - w / 2;
+      var dy = clientY - ((r && r.top) || 0) - h / 2;
+      var dir = screenDirection(m.aim.az, m.aim.el, m.fovy, dx, dy, h);
+      var reach = Math.max(0.6, Math.min(4, m.fovy / 18));
+      var hit = nearestTarget((m.satTargets || []).concat(m.targets), dir, reach);
+      if (!hit) { hideCard(); return null; }
+      var info = describe(hit);
+      showCard(info, clientX, clientY);
+      return info;
+    }
 
     // -- geometry --------------------------------------------------------
 
@@ -593,7 +799,7 @@
             text = b.label + ' ' + (mag >= 0 ? '+' : '') + fmt(mag, 1);
           }
           L.bodyLabels[b.key].text = text;
-          targets.push({ name: text, enu: enu, kind: 'body', priority: 0 });
+          targets.push({ name: text, enu: enu, kind: 'body', priority: 0, key: b.key });
         } catch (e) { /* one body failing must not stop the rest */ }
       });
 
@@ -604,7 +810,9 @@
         L.starLabels.forEach(function (s) { s.label.show = s.mag <= Math.min(limit, 2.5); });
       }
       L.starLabels.forEach(function (s) {
-        if (s.mag <= limit) targets.push({ name: s.name, enu: toEnu(s.v), kind: 'star', priority: 1 });
+        if (s.mag <= limit) {
+          targets.push({ name: s.name, enu: toEnu(s.v), kind: 'star', priority: 1, mag: s.mag, v: s.v });
+        }
       });
       L.conLabels.forEach(function (c) {
         targets.push({ name: c.name, enu: toEnu(c.v), kind: 'constellation', priority: 3 });
@@ -637,7 +845,7 @@
           if (!(range > 0)) continue;
           var el = Math.asin(enu.z / range) * R2D;
           if (el < SAT_LABEL_MIN_EL) continue;
-          list.push({ s: s, range: range, el: el, az: azElOf([enu.x, enu.y, enu.z]).az });
+          list.push({ s: s, id: ids[i], range: range, el: el, az: azElOf([enu.x, enu.y, enu.z]).az });
         }
       } catch (e) { list = []; }
       list.sort(function (a, b) { return a.range - b.range; });
@@ -652,7 +860,9 @@
       });
       m.satTargets = list.map(function (it) {
         return { name: String(it.s.name || 'SAT') + ' (' + Math.round(it.range / 1000) + ' km)',
-          enu: enuDirection(it.az, it.el), kind: 'satellite', priority: -1 };
+          enu: enuDirection(it.az, it.el), kind: 'satellite', priority: -1,
+          label: String(it.s.name || 'SAT'), norad: it.s.noradId != null ? it.s.noradId : Number(it.id),
+          range: it.range };
       });
     }
 
@@ -702,6 +912,7 @@
       var canvas = viewer.canvas;
       listen(canvas, 'pointerdown', function (e) {
         m.drag = { x: e.clientX, y: e.clientY };
+        m.press = { x: e.clientX, y: e.clientY, t: Date.now() };
       });
       listen(global, 'pointermove', function (e) {
         if (!m.drag) return;
@@ -709,7 +920,16 @@
         look(-(e.clientX - m.drag.x) * k, (e.clientY - m.drag.y) * k);
         m.drag = { x: e.clientX, y: e.clientY };
       });
-      listen(global, 'pointerup', function () { m.drag = null; });
+      listen(global, 'pointerup', function (e) {
+        m.drag = null;
+        var p = m.press;
+        m.press = null;
+        // A press that barely moved is a click: say what is under it.
+        if (p && e && Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y) < 6 &&
+            Date.now() - p.t < 800) {
+          identifyAt(e.clientX, e.clientY);
+        }
+      });
       listen(canvas, 'wheel', function (e) {
         zoom(e.deltaY > 0 ? 1.1 : 1 / 1.1);
         if (e.preventDefault) e.preventDefault();
@@ -719,7 +939,7 @@
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
         var step = Math.max(0.5, m.fovy / 20);
         var used = true;
-        if (e.key === 'Escape') exit();
+        if (e.key === 'Escape') { if (m.cardInfo) hideCard(); else exit(); }
         else if (e.key === 'ArrowLeft') look(-step, 0);
         else if (e.key === 'ArrowRight') look(step, 0);
         else if (e.key === 'ArrowUp') look(0, step);
@@ -857,6 +1077,8 @@
       if (!m.active) return;
       m.active = false;
       m.drag = null;
+      m.press = null;
+      hideCard();
       if (m.removePreRender) { m.removePreRender(); m.removePreRender = null; }
       m.listeners.forEach(function (off) { try { off(); } catch (e) { /* keep going */ } });
       m.listeners = [];
@@ -964,7 +1186,129 @@
 
     m.enter = enter;
     m.exit = exit;
+    m.identifyAt = identifyAt;
     return m;
+  }
+
+  // ---------------------------------------------------------------------
+  // The Sun and the Moon on the globe's own space view. Cesium draws both but
+  // does not make them pickable, so a click that misses the Earth is tested
+  // against their directions here and the page shows what was clicked.
+  // ---------------------------------------------------------------------
+
+  var OBLIQUITY_RAD = 23.4393 * Math.PI / 180;
+  var SPACE_BODIES = {
+    Sun: { radiusKm: 695700, minDeg: 2.5, name: 'The Sun' },
+    Moon: { radiusKm: 1737.4, minDeg: 1.2, name: 'The Moon' }
+  };
+
+  function norm3(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+
+  /** Ecliptic longitude in degrees of an Earth-centred equatorial (inertial) vector. */
+  function eclipticLongitude(v) {
+    var y = v[1] * Math.cos(OBLIQUITY_RAD) + v[2] * Math.sin(OBLIQUITY_RAD);
+    var lon = Math.atan2(y, v[0]) * 180 / Math.PI;
+    return (lon + 360) % 360;
+  }
+
+  /** Moon minus Sun ecliptic longitude: 0 new, 90 first quarter, 180 full. */
+  function moonPhaseDeg(sunI, moonI) {
+    return ((eclipticLongitude(moonI) - eclipticLongitude(sunI)) % 360 + 360) % 360;
+  }
+
+  /** Lit share of the disc for a phase angle from moonPhaseDeg, 0 to 1. */
+  function litFraction(phaseDeg) {
+    return (1 - Math.cos(phaseDeg * Math.PI / 180)) / 2;
+  }
+
+  /** Latitude and longitude where a body (Earth-fixed vector) is straight overhead. */
+  function subPoint(v) {
+    var r = norm3(v);
+    if (!(r > 0)) return null;
+    return { lat: Math.asin(v[2] / r) * 180 / Math.PI, lon: Math.atan2(v[1], v[0]) * 180 / Math.PI };
+  }
+
+  function latLonText(p) {
+    if (!p) return '--';
+    return Math.abs(p.lat).toFixed(1) + (p.lat >= 0 ? ' N, ' : ' S, ') +
+      Math.abs(p.lon).toFixed(1) + (p.lon >= 0 ? ' E' : ' W');
+  }
+
+  /**
+   * The body a view ray points at, or null. dir is the ray direction, cam the
+   * camera position and bodies [{key, pos}] in the same frame (metres). A body
+   * counts when the ray passes within max(minDeg, 1.6 x its angular radius).
+   */
+  function bodyUnderRay(dir, cam, bodies) {
+    var dn = norm3(dir);
+    if (!(dn > 0)) return null;
+    var best = null;
+    (bodies || []).forEach(function (b) {
+      var spec = SPACE_BODIES[b.key];
+      if (!spec || !b.pos) return;
+      var v = [b.pos[0] - cam[0], b.pos[1] - cam[1], b.pos[2] - cam[2]];
+      var vn = norm3(v);
+      if (!(vn > 0)) return;
+      var c = (dir[0] * v[0] + dir[1] * v[1] + dir[2] * v[2]) / (dn * vn);
+      var angle = Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
+      var radiusDeg = Math.asin(Math.min(1, spec.radiusKm * 1000 / vn)) * 180 / Math.PI;
+      var reach = Math.max(spec.minDeg, 1.6 * radiusDeg);
+      if (angle <= reach && (!best || angle < best.angle)) {
+        best = { key: b.key, angle: angle, rangeKm: vn / 1000 };
+      }
+    });
+    return best;
+  }
+
+  /** The card for a clicked Sun or Moon (vectors in metres, Earth-centred). */
+  function describeSpaceBody(key, sunI, moonI, fixedPos) {
+    var facts = BODY_FACTS[key] || {};
+    var rows = [['WHAT', facts.fact || '']];
+    if (key === 'Moon') {
+      var ph = moonPhaseDeg(sunI, moonI);
+      rows.push(['PHASE', moonPhaseName(ph) + ', ' + Math.round(litFraction(ph) * 100) + '% lit']);
+      rows.push(['DISTANCE', Math.round(norm3(moonI) / 1000).toLocaleString('en-US') +
+        ' km from the centre of the Earth']);
+    } else {
+      var au = norm3(sunI) / 1000 / AU_KM;
+      rows.push(['DISTANCE', fmt(au, 3) + ' AU, light takes ' + fmt(au * LIGHT_MIN_PER_AU, 1) + ' min']);
+    }
+    rows.push(['OVERHEAD AT', latLonText(subPoint(fixedPos))]);
+    rows.push(['SKY VIEW', 'stand anywhere and look up for the planets and stars too']);
+    return { name: SPACE_BODIES[key].name, type: facts.kind || key, rows: rows };
+  }
+
+  function cartArray(c) { return [c.x, c.y, c.z]; }
+
+  /** What lies under a click on the globe's space view, as an info card, or null. */
+  function spaceBodyAt(viewer, windowPos) {
+    var C = global.Cesium;
+    try {
+      if (!C || !viewer || !windowPos || (current && current.active)) return null;
+      var scene = viewer.scene;
+      if (scene.mode !== C.SceneMode.SCENE3D) return null;
+      var cam = viewer.camera;
+      if (cam.pickEllipsoid(windowPos, scene.globe.ellipsoid)) return null; // the Earth is in the way
+      var ray = cam.getPickRay(windowPos);
+      if (!ray) return null;
+      var time = viewer.clock.currentTime;
+      var P = C.Simon1994PlanetaryPositions;
+      var sunI = P.computeSunPositionInEarthInertialFrame(time, new C.Cartesian3());
+      var moonI = P.computeMoonPositionInEarthInertialFrame(time, new C.Cartesian3());
+      var m = C.Transforms.computeIcrfToFixedMatrix(time) ||
+        C.Transforms.computeTemeToPseudoFixedMatrix(time);
+      var sunF = C.Matrix3.multiplyByVector(m, sunI, new C.Cartesian3());
+      var moonF = C.Matrix3.multiplyByVector(m, moonI, new C.Cartesian3());
+      var bodies = [];
+      if (!scene.sun || scene.sun.show !== false) bodies.push({ key: 'Sun', pos: cartArray(sunF) });
+      if (!scene.moon || scene.moon.show !== false) bodies.push({ key: 'Moon', pos: cartArray(moonF) });
+      var hit = bodyUnderRay(cartArray(ray.direction), cartArray(cam.positionWC), bodies);
+      if (!hit) return null;
+      return describeSpaceBody(hit.key, cartArray(sunI), cartArray(moonI),
+        cartArray(hit.key === 'Sun' ? sunF : moonF));
+    } catch (e) {
+      return null;
+    }
   }
 
   var current = null;
@@ -987,6 +1331,7 @@
     enter: function (observer) { return current ? current.enter(observer) : Promise.resolve(false); },
     exit: function () { if (current) current.exit(); },
     isActive: function () { return !!(current && current.active); },
+    identifyAt: function (x, y) { return current ? current.identifyAt(x, y) : null; },
     ASTRO_SRC: ASTRO_SRC,
     ASTRO_SRI: ASTRO_SRI,
     SKY_DATA_PATH: SKY_DATA_PATH,
@@ -1004,6 +1349,17 @@
     moonPhaseName: moonPhaseName,
     starSize: starSize,
     starColor: starColor,
-    nearestTarget: nearestTarget
+    nearestTarget: nearestTarget,
+    screenDirection: screenDirection,
+    raDecOf: raDecOf,
+    whenText: whenText,
+    spaceBodyAt: spaceBodyAt,
+    bodyUnderRay: bodyUnderRay,
+    describeSpaceBody: describeSpaceBody,
+    eclipticLongitude: eclipticLongitude,
+    moonPhaseDeg: moonPhaseDeg,
+    litFraction: litFraction,
+    subPoint: subPoint,
+    BODY_FACTS: BODY_FACTS
   };
 })(typeof window !== 'undefined' ? window : this);

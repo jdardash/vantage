@@ -1,0 +1,63 @@
+[
+ {
+  "device_urn": "note:dev:000000000000001",
+  "device_class": "product:com.blues.radnote",
+  "device": 1001,
+  "when_captured": "2026-11-18T03:37:18Z",
+  "loc_lat": 37.4733325,
+  "loc_lon": 140.94144140625002,
+  "loc_name": "Namie",
+  "loc_country": "JP",
+  "lnd_7318c": 40.08,
+  "device_contact_name": "Test Person",
+  "device_contact_email": "person@example.invalid",
+  "device_contact_org": "Example Org",
+  "dev_dashboard": "http://example.invalid/ID/1"
+ },
+ {
+  "device_urn": "note:dev:000000000000002",
+  "device_class": "product:org.airnote.solar.air.v1",
+  "device": 1002,
+  "when_captured": "2026-11-18T03:00:00Z",
+  "loc_lat": 35.0,
+  "loc_lon": 139.0,
+  "loc_name": "Air Only",
+  "loc_country": "JP",
+  "pms_pm02_5": 3.2
+ },
+ {
+  "device_urn": "note:dev:000000000000003",
+  "device_class": "product:com.blues.radnote",
+  "device": 1003,
+  "when_captured": "2026-01-01T00:00:00Z",
+  "loc_lat": 36.0,
+  "loc_lon": 140.0,
+  "loc_name": "Stale",
+  "loc_country": "JP",
+  "lnd_7128ec": 12.0
+ },
+ {
+  "device_urn": "pointcast:20000004",
+  "device_class": "pointcast",
+  "device": 1004,
+  "when_captured": "2026-11-19T01:00:00Z",
+  "loc_lat": 34.123456,
+  "loc_lon": -118.987654,
+  "loc_country": "US",
+  "lnd_78017w": 200
+ },
+ {
+  "device_urn": "note:dev:000000000000001",
+  "device_class": "product:com.blues.radnote",
+  "device": 1001,
+  "when_captured": "2026-11-18T04:00:00Z",
+  "loc_lat": 37.47,
+  "loc_lon": 140.94,
+  "lnd_7318c": 41.0
+ },
+ {
+  "device": 1005,
+  "when_captured": "2026-11-19T01:00:00Z",
+  "lnd_7318u": 33.4
+ }
+]

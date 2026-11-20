@@ -1,0 +1,143 @@
+{
+ "type": "FeatureCollection",
+ "name": "submarine_cables",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "alpha-link",
+    "name": "Alpha Link",
+    "color": "#12ab34",
+    "feature_id": "alpha-link-0"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -9.0,
+       52.0
+      ],
+      [
+       -39.0,
+       52.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "alpha-link",
+    "name": "Alpha Link",
+    "color": "#12ab34",
+    "feature_id": "alpha-link-1"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -4.0,
+       48.0
+      ],
+      [
+       -9.0,
+       52.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "beta-cable",
+    "name": "Beta Cable",
+    "color": "#0000ff"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -9.0,
+      52.0
+     ],
+     [
+      -8.5,
+      51.8
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "gamma-express",
+    "name": "Gamma Express",
+    "color": "red; background:url(x)"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       12.2,
+       -6.0
+      ],
+      [
+       5.0,
+       43.0
+      ]
+     ],
+     [
+      [
+       179.5,
+       -16.0
+      ],
+      [
+       -179.5,
+       -16.5
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "Bad Id!",
+    "name": "Bad",
+    "color": "#000000"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      0.0,
+      1.0
+     ],
+     [
+      1.0,
+      1.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "no-geometry",
+    "name": "No Geometry"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     0.0,
+     1.0
+    ]
+   }
+  }
+ ]
+}

@@ -51,6 +51,7 @@ the adaptation was made from.
 | `src/sda/satcat.py` | [ISHANTARE/ASTRA](https://github.com/ISHANTARE/ASTRA) | `astra/spacebook.py` | 74123de | MIT | The Spacebook endpoint paths, the `noradId` / `id` field names, cache age by file and the stale-cache fallback. The streaming parser, compact records, backoff and the Space-Track fallback are ours |
 | `src/sda/satcat.py`, `src/sda/templates/static/js/dossier.js` | [PremaanshVyas/satlas](https://github.com/PremaanshVyas/satlas) | `apps/web/src/lib/satcat.ts` | 410f923 | MIT | The fact-card field set, the 24 h cache rule, status from the decay date, a minimum record count before a reply replaces the cache, and owner and site codes mapped to names (tables corrected and extended) |
 | `src/sda/satcat.py`, `src/sda/templates/static/js/dossier.js` | keeptrack.space | `sat-info-box-object/object-summary.ts`, `app/data/catalogs/countries.ts` | db3b64e | AGPL-3.0, ideas only | The plain-words summary line and a check of our launch-site names; no code taken |
+| `src/sda/templates/static/js/models.js` (`classifyAircraft`, the type-designator sets and the emitter-category table) | gev-worldcams (God's Eye View fork) | `src/data/aircraftClass.js`, itself adapted from skylight (MIT) | 5804ba8 | MIT, Copyright (c) 2026 Bilawal Sidhu | The aircraft class sets and table; the model swap radii and nose offset from `flights.js` as ideas, rewritten |
 
 Copyright holders, from each donor's `LICENSE`: gods-eye-view, Copyright (c) 2026 Bilawal
 Sidhu; Argus, Copyright (c) 2026 Jeremy Hou; Gods-view-sweden, Copyright (c) 2026 Bilawal Sidhu
@@ -126,6 +127,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 | --- | --- | --- | --- |
 | `tests/data/cara/` | [nasa/CARA_Analysis_Tools](https://github.com/nasa/CARA_Analysis_Tools) | NASA Open Source Agreement 1.3 | 53 reference CDMs, the `PcMethodTestConjunctions` values and the Alfano 2009 cases, verbatim, with `NOTICE.md` and one agreement PDF alongside. Imported by `scripts/import_cara_fixtures.py` |
 | `src/sda/templates/static/data/sky.json` | [ofrohn/d3-celestial](https://github.com/ofrohn/d3-celestial) `data/` at 7e720a3 | BSD-3-Clause (notice above) | Hipparcos stars to magnitude 5.5 (2,851), proper names to magnitude 3 (156), the IAU constellation lines (150 strips) and label positions (89), rounded and re-packed by `scripts/build_sky_data.py`; the file carries its source and license fields |
+| `src/sda/templates/static/models/airplane.glb`, `jet.glb`, `atr72.glb`, `c172.glb`, `bell206.glb`, `mq9.glb` | gev-worldcams `public/models` at 5804ba8; originals on Sketchfab by zairiq-123 (boeing 747), Nick the Name (Private Jet), Oyan3D (ATR 72 - 600), e737 (Cessna 172), terran4627 (Bell 206 JetRanger) and IProZenoN (MQ-9) | CC BY 4.0 | Copied unchanged; `static/models/NOTICE.txt` carries the links. The ISS, Hubble, satellite and ship models are our own, built by `scripts/build_globe_models.py` |
 
 ## Runtime services and libraries loaded by the page
 
@@ -155,3 +157,41 @@ These are fetched by the browser or proxied by the server at run time; none is b
 | astronomy-engine 2.1.19 | jsDelivr, pinned with SRI, loaded only when the sky view opens | MIT, Copyright (c) 2019-2023 Don Cross |
 | hls.js 1.7.4 | jsDelivr, loaded only when an HLS camera plays | Apache-2.0 |
 | Traffic and weather camera feeds | the operating agencies, through the Argus catalog | Each agency's terms. Sources whose terms forbid reuse open as a link to the agency page and are never played or proxied here |
+| OFAC Specially Designated Nationals list (vessels and aircraft) | US Treasury `sdn.csv` and `sdn_comments.csv`, downloaded at most daily by `src/sda/sanctions.py`; sample rows in `tests/data/sanctions/` | Public domain (US Government) |
+| UK Sanctions List (ships) | FCDO `UK-Sanctions-List.csv`, same cadence; sample rows in `tests/data/sanctions/` | Open Government Licence v3.0. Contains public sector information licensed under the Open Government Licence v3.0 |
+| Maritime chokepoint monitors | The idea of a chokepoint list with sanctioned-vessel flags comes from worldmonitor (AGPL-3.0, ideas only); the nine polygons in `src/sda/maritime.py` are our own approximations | Ours |
+| Country borders for the country card and choropleth | Natural Earth admin-0 1:50m from the nvkelso/natural-earth-vector mirror, downloaded once to `SDA_INTEL_DIR`; 14 countries in `tests/data/intel/` | Public domain |
+| Country indicators, capitals and regions | World Bank Indicators API v2 | CC BY 4.0, credited in the card |
+| Disease outbreaks | WHO Disease Outbreak News (titles and links only) | WHO terms |
+| Botnet command-and-control counts per country | abuse.ch Feodo Tracker; counts only, no IP addresses passed on | CC0 |
+| Internet outages per country | IODA, Georgia Tech | Attribution |
+| News events (the News mentions layer and the country card) | The GDELT Project 2.0 event export, 15-minute files read by `src/sda/intel.py`; actor names are dropped; a 60-row sample in `tests/data/intel/` | Free use with attribution to the GDELT Project |
+| Exchange local time | IANA tz database through `tzdata` | Public domain |
+| Geographic convergence and the WHO title split into disease and place | worldmonitor (AGPL-3.0), ideas only; `src/sda/intel.py` is written fresh | Ours |
+| Military aircraft, emergency squawks and the aircraft card | adsb.lol `/v2`, through `src/sda/aviation.py` with a shared daily budget; trimmed samples in `tests/data/aviation/` | ODbL |
+| Callsign routes (scheduled, not reported by the aircraft) | Virtual Radar Server standing data | CC0 |
+| Route plausibility tolerance, max(50 NM, 20% of the leg) | adsblol/api (BSD-3-Clause), idea rewritten in `src/sda/aviation.py` | BSD-3-Clause, no code copied |
+| GPS interference hexes | GPSJam's method (100 x (bad - 1) / total, 2% and 10% breaks, NIC below 7 or NACp below 8), applied to adsb.lol reports; hex math after the Red Blob Games hexagon guide | Ideas only |
+| Emergency squawk handling and retention | worldmonitor (AGPL-3.0), ideas only | Ours |
+| Power plants | WRI Global Power Plant Database v1.3, imported by `python -m sda.infra import` into `SDA_INFRA_DIR` | CC BY 4.0 |
+| Airports | OurAirports `airports.csv`, same import | Public domain |
+| Seaports | NGA World Port Index (Pub 150), through its ArcGIS copy, same import | Public domain |
+| Dams | Wikidata SPARQL (dam and barrage classes), same import | CC0 |
+| Data centres | PeeringDB `/api/fac`, same import | PeeringDB acceptable use policy |
+| Radiation monitoring stations | BfS ODL-Info (Germany) and the Safecast device list; no contact fields read, positions rounded to 0.01 degree | dl-de/by-2-0 (BfS); CC0 (Safecast) |
+| Submarine cables and landing points | TeleGeography Submarine Cable Map api/v3, fetched at run time into the user's own cache only and never committed (the test samples are made up) | CC BY-NC-SA 3.0: non-commercial use, credited in the card |
+| The cable endpoint pair, the WRI source with plants ranked by capacity, rhumb-line cable edges | gods-eye-view (MIT), ideas only; `src/sda/infra.py` is ours | Ours |
+| Orbit visuals: colour modes, watchlist, naked-eye passes, constellation planes, debris clouds, catalog history | keeptrack.space (AGPL-3.0), Heavens-Above and Stuff in Space, ideas only; `static/js/orbitviz.js` and `routes/orbitviz.py` are ours | Ours |
+| Aircraft match order in universal search (`routes/search.py` `aircraft_tier`, `static/js/omnisearch.js` `aircraftTier`) | bilawalsidhu/gods-eye-view `src/data/contactMatch.js` at 9423a26 | MIT; ranking order rewritten |
+| Camera wall grid of live feeds | godseye `WebcamDock.jsx` at eb4b8db | Apache-2.0; layout idea, no code |
+| Touch long press for What's here (600 ms, 10 px drift, a second finger cancels) | worldmonitor `long-press.ts` at c19b0256 (AGPL-3.0) | Idea only, rewritten |
+| What's here current conditions | Open-Meteo, called from the browser, cached 10 minutes per point; normalisation idea from gev-worldcams `regionalBrief.js` at 5804ba8 (MIT) | CC BY 4.0, non-commercial use |
+| Live infrared clouds | NASA GIBS (GOES-East, GOES-West, Himawari infrared, GOES GeoColor) and the NOAA nowCOAST global infrared mosaic (GMGSI), loaded by `static/js/clouds.js` | Public, credit to NASA and NOAA |
+| Ukraine front line and occupied areas | DeepStateMap public map API, fetched by `src/sda/conflict.py` (30 minute cache, past maps kept on disk) and credited on the globe; the three test samples in `tests/data/conflict/` are synthetic | No published terms; fetched at run time only, nothing of DeepState's committed |
+| Ukraine land outline that keeps the derived line on land | geoBoundaries gbHumanitarian UKR ADM0 (OCHA COD-AB), cached 180 days | CC BY 3.0 IGO |
+| Who holds each town in 13 other theatres | Wikipedia detailed-map modules (Syria, Sudan, Myanmar, Yemen and others), cached 6 hours, the revision linked from each place | CC BY-SA 4.0 |
+| Verified conflict events | GeoConfirmed public API, 90 day window, every event links to its own source | Credited, links back |
+| Armed conflict history since 1989 | UCDP Georeferenced Event Dataset 26.1 and the Candidate dataset, imported offline by `python -m sda.conflict import`; cite Davies, Pettersson and Oberg | CC BY 4.0 |
+| Political violence and protest events (optional) | ACLED, only when the user sets `ACLED_EMAIL` and `ACLED_PASSWORD` | The user's own ACLED account terms |
+| A front-lines route beside a conflict feed | simplifaisoul/osiris (MIT), idea only | Ours, no code copied |
+| What a planet or the Moon is (diameter, length of year) on the sky view card | NASA planetary and lunar fact sheets | Public, credit to NASA |

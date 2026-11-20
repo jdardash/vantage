@@ -354,6 +354,284 @@
   }
 
   // ---------------------------------------------------------------------
+  // Favourites: starred cameras, newest first, in localStorage
+  // ---------------------------------------------------------------------
+
+  // Only what a list row needs is stored (never a feed URL, which is fetched
+  // fresh from /api/cameras/{rid} when a feed is played).
+  var FAV_KEY = 'sda.cameras.v1.favourites';
+  var MAX_FAVOURITES = 60;
+
+  function memoryStorage() {
+    var data = {};
+    return {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null; },
+      setItem: function (k, v) { data[k] = String(v); },
+      removeItem: function (k) { delete data[k]; }
+    };
+  }
+
+  // localStorage when it works (private windows can throw), else memory.
+  function pickStorage() {
+    try {
+      var s = global.localStorage;
+      if (s) {
+        s.setItem(FAV_KEY + '.probe', '1');
+        s.removeItem(FAV_KEY + '.probe');
+        return s;
+      }
+    } catch (e) { /* fall through */ }
+    return memoryStorage();
+  }
+
+  function shortText(v, max) {
+    return typeof v === 'string' ? v.replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, max) : '';
+  }
+
+  // A clean favourite record, or null when the input has no usable id.
+  function favRecord(cam) {
+    if (!cam || !isNum(cam.rid) || cam.rid <= 0 || Math.floor(cam.rid) !== cam.rid) return null;
+    return {
+      rid: cam.rid,
+      name: shortText(cam.name, 160) || 'Camera',
+      lat: isNum(cam.lat) && Math.abs(cam.lat) <= 90 ? cam.lat : null,
+      lon: isNum(cam.lon) && Math.abs(cam.lon) <= 180 ? cam.lon : null,
+      group: shortText(cam.group, 20),
+      city: shortText(cam.city, 80),
+      country: shortText(cam.country, 80)
+    };
+  }
+
+  function createFavourites(storage) {
+    var items = [];
+    var listeners = [];
+    try {
+      var raw = JSON.parse(storage.getItem(FAV_KEY) || '[]');
+      if (Array.isArray(raw)) {
+        raw.forEach(function (r) {
+          var f = favRecord(r);
+          if (f && !items.some(function (x) { return x.rid === f.rid; })) items.push(f);
+        });
+      }
+    } catch (e) { items = []; }
+    items = items.slice(0, MAX_FAVOURITES);
+
+    function save() {
+      try { storage.setItem(FAV_KEY, JSON.stringify(items)); } catch (e) { /* memory only */ }
+      listeners.slice().forEach(function (fn) { try { fn(items.slice()); } catch (e) { /* next */ } });
+    }
+    function at(rid) {
+      for (var i = 0; i < items.length; i++) if (items[i].rid === rid) return i;
+      return -1;
+    }
+    var api = {
+      list: function () { return items.slice(); },
+      has: function (rid) { return at(rid) >= 0; },
+      count: function () { return items.length; },
+      add: function (cam) {
+        var f = favRecord(cam);
+        if (!f) return false;
+        var i = at(f.rid);
+        if (i >= 0) items.splice(i, 1);
+        items.unshift(f);
+        if (items.length > MAX_FAVOURITES) items.length = MAX_FAVOURITES;
+        save();
+        return true;
+      },
+      remove: function (rid) {
+        var i = at(rid);
+        if (i < 0) return false;
+        items.splice(i, 1);
+        save();
+        return true;
+      },
+      toggle: function (cam) {
+        if (cam && api.has(cam.rid)) { api.remove(cam.rid); return false; }
+        return api.add(cam);
+      },
+      clear: function () { items = []; save(); },
+      onChange: function (fn) {
+        listeners.push(fn);
+        return function () { var i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); };
+      }
+    };
+    return api;
+  }
+
+  var favStore = null;
+  function favourites() {
+    if (!favStore) favStore = createFavourites(pickStorage());
+    return favStore;
+  }
+
+  // ---------------------------------------------------------------------
+  // Feed player, shared by the single viewer and the camera wall
+  // ---------------------------------------------------------------------
+
+  function showMessage(media, text) {
+    media.replaceChildren(el('div', 'cams-msg', text));
+  }
+
+  // Play one camera's feed into `media`, adding its source link to `foot`.
+  // Returns a handle: stop() releases timers and hls.js, pause() and resume()
+  // hold a feed while nobody can see it (stills stop refreshing, MJPEG and
+  // YouTube are unloaded, video and HLS pause and stop loading).
+  function playFeed(media, foot, cam, api) {
+    var plan = feedPlan(cam, api || '');
+    var h = { plan: plan, timer: null, hls: null, node: null, paused: false, stopped: false };
+    if (plan.link && foot) {
+      var a = outLink(plan.link, plan.mode === 'link' ? 'Open camera page' : 'Source');
+      if (a) foot.appendChild(a);
+    }
+
+    function clearTimer() { if (h.timer) { global.clearInterval(h.timer); h.timer = null; } }
+    function dropHls() {
+      if (h.hls) { try { h.hls.destroy(); } catch (e) { /* keep going */ } h.hls = null; }
+    }
+
+    if (plan.mode === 'img') {
+      var img = el('img');
+      img.setAttribute('alt', textOr(cam.name, 'Camera'));
+      img.setAttribute('referrerpolicy', 'no-referrer');
+      var busted = plan.refreshS > 0;
+      var failed = false;
+      var still = function () { return busted ? bustUrl(plan.src, Date.now()) : plan.src; };
+      img.onerror = function () {
+        if (h.paused || h.stopped) return;
+        if (busted) { busted = false; img.src = plan.src; return; } // signed URLs dislike extras
+        failed = true;
+        showMessage(media, 'The feed did not load here. Try the source link.');
+      };
+      img.src = still();
+      media.replaceChildren(img);
+      h.node = img;
+      var startTimer = function () {
+        if (plan.refreshS > 0 && !h.timer) {
+          h.timer = global.setInterval(function () {
+            // A hidden tab gets no new stills: no point pulling an agency's
+            // camera every few seconds for a page nobody is looking at.
+            if (failed || h.paused || (global.document && global.document.hidden)) return;
+            img.src = still();
+          }, plan.refreshS * 1000);
+        }
+      };
+      startTimer();
+      h.pause = function () {
+        if (h.paused || h.stopped) return;
+        h.paused = true;
+        clearTimer();
+        // An MJPEG stream keeps downloading for as long as the image has it.
+        if (plan.refreshS === 0) img.removeAttribute('src');
+      };
+      h.resume = function () {
+        if (!h.paused || h.stopped) return;
+        h.paused = false;
+        if (!failed) img.src = still();
+        startTimer();
+      };
+    } else if (plan.mode === 'video' || plan.mode === 'hls') {
+      var video = el('video');
+      video.muted = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.controls = true;
+      video.setAttribute('muted', '');
+      video.setAttribute('playsinline', '');
+      if (plan.mode === 'video') video.loop = true;
+      video.onerror = function () {
+        if (h.stopped) return;
+        showMessage(media, 'The stream did not play here. Try the source link.');
+      };
+      media.replaceChildren(video);
+      h.node = video;
+      if (plan.mode === 'video' || video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = plan.src;
+      } else {
+        loadHls().then(function (Hls) {
+          // the viewer may have closed or moved on while hls.js loaded
+          if (h.stopped || video.isConnected === false) return;
+          if (!Hls.isSupported()) { video.src = plan.src; return; }
+          dropHls();
+          var hls = new Hls({ lowLatencyMode: true, maxBufferLength: 10 });
+          h.hls = hls;
+          hls.on(Hls.Events.ERROR, function (_evt, data) {
+            if (data && data.fatal) {
+              showMessage(media, 'The stream did not play here (' +
+                textOr(data.details, 'error') + '). Try the source link.');
+              dropHls();
+            }
+          });
+          hls.loadSource(plan.src);
+          hls.attachMedia(video);
+          if (h.paused) { try { hls.stopLoad(); } catch (e) { /* keep going */ } }
+        }).catch(function () {
+          showMessage(media, 'The HLS player did not load. Try the source link.');
+        });
+      }
+      h.pause = function () {
+        if (h.paused || h.stopped) return;
+        h.paused = true;
+        try { video.pause(); } catch (e) { /* keep going */ }
+        if (h.hls) { try { h.hls.stopLoad(); } catch (e) { /* keep going */ } }
+      };
+      h.resume = function () {
+        if (!h.paused || h.stopped) return;
+        h.paused = false;
+        if (h.hls) { try { h.hls.startLoad(-1); } catch (e) { /* keep going */ } }
+        try {
+          var p = video.play();
+          if (p && typeof p.catch === 'function') p.catch(function () { /* autoplay refused */ });
+        } catch (e) { /* keep going */ }
+      };
+    } else if (plan.mode === 'youtube') {
+      var frame = el('iframe');
+      frame.setAttribute('src', plan.src);
+      frame.setAttribute('title', textOr(cam.name, 'Camera'));
+      frame.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+      frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      frame.setAttribute('allowfullscreen', '');
+      media.replaceChildren(frame);
+      h.node = frame;
+      // Without the YouTube player API there is no pause: unload and reload.
+      h.pause = function () {
+        if (h.paused || h.stopped) return;
+        h.paused = true;
+        frame.setAttribute('src', 'about:blank');
+      };
+      h.resume = function () {
+        if (!h.paused || h.stopped) return;
+        h.paused = false;
+        frame.setAttribute('src', plan.src);
+      };
+    } else if (plan.mode === 'link') {
+      showMessage(media, 'This camera plays on its operator\'s page; use the link below.');
+    } else {
+      showMessage(media, 'No playable feed for this camera.');
+    }
+    if (!h.pause) {
+      h.pause = function () { h.paused = true; };
+      h.resume = function () { h.paused = false; };
+    }
+    h.stop = function () {
+      h.stopped = true;
+      clearTimer();
+      dropHls();
+      if (h.node && h.node.tagName === 'VIDEO') { try { h.node.pause(); } catch (e) { /* gone */ } }
+    };
+    return h;
+  }
+
+  // One camera's full record from the server.
+  function fetchCamera(api, rid) {
+    if (!isNum(rid)) return Promise.reject(new Error('no camera id'));
+    if (typeof global.fetch !== 'function') return Promise.reject(new Error('no fetch'));
+    return global.fetch((api || '') + '/api/cameras/' + rid).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  // ---------------------------------------------------------------------
   // The module
   // ---------------------------------------------------------------------
 
@@ -364,8 +642,8 @@
     var m = {
       ctx: ctx, enabled: false, summary: null, groupsOn: {}, playableOnly: false,
       seq: 0, timer: null, mode: '', points: null, labels: null, density: null,
-      frame: null, openRid: null, refreshTimer: null, hls: null, selectedSat: null,
-      lastView: null
+      frame: null, openRid: null, player: null, selectedSat: null,
+      lastView: null, star: null
     };
     GROUPS.forEach(function (g) { m.groupsOn[g.key] = true; });
 
@@ -409,6 +687,11 @@
     row.appendChild(m.randomBtn);
     row.appendChild(m.nearBtn);
     row.appendChild(m.satBtn);
+    var row2 = el('div', 'cams-row');
+    m.starredBtn = button('mode-btn', 'STARRED', 'List the cameras you starred');
+    m.wallBtn = button('mode-btn', 'WALL', 'Open the camera wall: up to nine starred feeds at once');
+    row2.appendChild(m.starredBtn);
+    row2.appendChild(m.wallBtn);
     m.view = el('div', 'cams-view');
     m.view.setAttribute('aria-live', 'polite');
     m.status = el('div', 'cams-status');
@@ -420,6 +703,7 @@
     body.appendChild(checkLabel);
     body.appendChild(m.view);
     body.appendChild(row);
+    body.appendChild(row2);
     body.appendChild(m.status);
     body.appendChild(m.list);
     m.root.appendChild(head);
@@ -580,13 +864,16 @@
       var v = viewState();
       var mode = modeForHeight(v.height);
       var groups = activeGroups();
-      var seq = ++m.seq;
+      // The sequence moves only when a request is actually sent: a refresh for the
+      // view already asked for must not orphan the answer still on its way.
+      var seq;
       if (mode === 'density') {
         var cell = cellForHeight(v.height);
         var dbox = cell >= 4 ? { west: -180, south: -90, east: 180, north: 90 } : v.box;
         var key = 'd' + cell + JSON.stringify(dbox) + groups;
         if (!force && key === m.lastView) return;
         m.lastView = key;
+        seq = ++m.seq;
         getJson('/api/cameras/density' + query([
           ['west', dbox.west], ['south', dbox.south], ['east', dbox.east], ['north', dbox.north],
           ['cell', cell], ['groups', groups]
@@ -602,6 +889,7 @@
         var key2 = 'v' + JSON.stringify(b) + groups + m.playableOnly;
         if (!force && key2 === m.lastView) return;
         m.lastView = key2;
+        seq = ++m.seq;
         getJson('/api/cameras' + query([
           ['west', b.west], ['south', b.south], ['east', b.east], ['north', b.north],
           ['limit', VIEW_LIMIT], ['groups', groups], ['playable_only', m.playableOnly ? 'true' : '']
@@ -630,8 +918,14 @@
     // -- viewer -----------------------------------------------------------
 
     function stopMedia() {
-      if (m.refreshTimer) { global.clearInterval(m.refreshTimer); m.refreshTimer = null; }
-      if (m.hls) { try { m.hls.destroy(); } catch (e) { /* keep going */ } m.hls = null; }
+      if (m.player) { m.player.stop(); m.player = null; }
+    }
+
+    // A hidden tab holds the open feed; it picks up again when shown.
+    function onVisibility() {
+      if (!m.player) return;
+      if (global.document && global.document.hidden) m.player.pause();
+      else m.player.resume();
     }
 
     function closeViewer() {
@@ -652,6 +946,22 @@
       dot.style.background = groupColor(cam.group);
       bar.appendChild(dot);
       bar.appendChild(el('span', 'cams-title', textOr(cam.name, 'Camera')));
+      var star = button('cams-btn cams-star', '', 'Star this camera for the camera wall');
+      var paintStar = function () {
+        var on = favourites().has(cam.rid);
+        star.textContent = on ? '\u2605' : '\u2606';
+        star.setAttribute('aria-pressed', on ? 'true' : 'false');
+        star.setAttribute('aria-label', on ? 'Unstar camera' : 'Star camera');
+      };
+      paintStar();
+      star.addEventListener('click', function () {
+        var on = favourites().toggle(cam);
+        paintStar();
+        setStatus(on ? 'Starred ' + textOr(cam.name, 'camera') + ' for the camera wall (' +
+          favourites().count() + ').' : 'Unstarred ' + textOr(cam.name, 'camera') + '.');
+      });
+      m.star = paintStar;
+      bar.appendChild(star);
       var size = button('cams-btn', 'Enlarge');
       size.addEventListener('click', function () {
         var big = frame.classList.toggle('cams-big');
@@ -676,89 +986,6 @@
       return { root: frame, media: media, foot: foot };
     }
 
-    function showMessage(media, text) {
-      media.replaceChildren(el('div', 'cams-msg', text));
-    }
-
-    function playInto(parts, cam) {
-      var plan = feedPlan(cam, api);
-      var media = parts.media;
-      if (plan.link) {
-        var a = outLink(plan.link, plan.mode === 'link' ? 'Open camera page' : 'Source');
-        if (a) parts.foot.appendChild(a);
-      }
-      if (plan.mode === 'img') {
-        var img = el('img');
-        img.setAttribute('alt', textOr(cam.name, 'Camera'));
-        img.setAttribute('referrerpolicy', 'no-referrer');
-        var busted = plan.refreshS > 0;
-        var failed = false;
-        img.onerror = function () {
-          if (busted) { busted = false; img.src = plan.src; return; } // signed URLs dislike extras
-          failed = true;
-          showMessage(media, 'The feed did not load here. Try the source link.');
-        };
-        img.src = busted ? bustUrl(plan.src, Date.now()) : plan.src;
-        media.replaceChildren(img);
-        if (plan.refreshS > 0) {
-          m.refreshTimer = global.setInterval(function () {
-            // A hidden tab gets no new stills: no point pulling an agency's
-            // camera every few seconds for a page nobody is looking at.
-            if (failed || (global.document && global.document.hidden)) return;
-            img.src = busted ? bustUrl(plan.src, Date.now()) : plan.src;
-          }, plan.refreshS * 1000);
-        }
-      } else if (plan.mode === 'video' || plan.mode === 'hls') {
-        var video = el('video');
-        video.muted = true;
-        video.autoplay = true;
-        video.playsInline = true;
-        video.controls = true;
-        video.setAttribute('muted', '');
-        video.setAttribute('playsinline', '');
-        if (plan.mode === 'video') video.loop = true;
-        video.onerror = function () {
-          showMessage(media, 'The stream did not play here. Try the source link.');
-        };
-        media.replaceChildren(video);
-        if (plan.mode === 'video' || video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = plan.src;
-        } else {
-          loadHls().then(function (Hls) {
-            // the viewer may have closed or moved on while hls.js loaded
-            if (video.isConnected === false) return;
-            if (!Hls.isSupported()) { video.src = plan.src; return; }
-            stopMedia();
-            var hls = new Hls({ lowLatencyMode: true, maxBufferLength: 10 });
-            m.hls = hls;
-            hls.on(Hls.Events.ERROR, function (_evt, data) {
-              if (data && data.fatal) {
-                showMessage(media, 'The stream did not play here (' +
-                  textOr(data.details, 'error') + '). Try the source link.');
-                stopMedia();
-              }
-            });
-            hls.loadSource(plan.src);
-            hls.attachMedia(video);
-          }).catch(function () {
-            showMessage(media, 'The HLS player did not load. Try the source link.');
-          });
-        }
-      } else if (plan.mode === 'youtube') {
-        var frame = el('iframe');
-        frame.setAttribute('src', plan.src);
-        frame.setAttribute('title', textOr(cam.name, 'Camera'));
-        frame.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
-        frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-        frame.setAttribute('allowfullscreen', '');
-        media.replaceChildren(frame);
-      } else if (plan.mode === 'link') {
-        showMessage(media, 'This camera plays on its operator\'s page; use the link below.');
-      } else {
-        showMessage(media, 'No playable feed for this camera.');
-      }
-    }
-
     function openCamera(rid) {
       if (!isNum(rid)) return;
       getJson('/api/cameras/' + rid).then(function (cam) {
@@ -767,7 +994,8 @@
         var parts = buildFrame(cam);
         m.frame = parts.root;
         global.document.body.appendChild(parts.root);
-        playInto(parts, cam);
+        m.player = playFeed(parts.media, parts.foot, cam, api);
+        if (global.document && global.document.hidden) m.player.pause();
         if (m.mode === 'detail' && m.visible) drawCameras(m.visible);
         note('Camera: ' + textOr(cam.name, 'unnamed') +
           (cam.city ? ' (' + cam.city + ')' : '') + ', ' + cam.feed + ' feed');
@@ -870,6 +1098,27 @@
       }, 300);
     });
 
+    function paintFavCount() {
+      var n = favourites().count();
+      m.starredBtn.textContent = n ? 'STARRED ' + n : 'STARRED';
+      if (m.star) m.star();
+    }
+    m.unwatchFavs = favourites().onChange(paintFavCount);
+    paintFavCount();
+
+    m.starredBtn.addEventListener('click', function () {
+      var list = favourites().list();
+      showList(list, 'No starred cameras yet. Open a camera and press its star.');
+      if (list.length) setStatus(list.length + ' starred cameras, newest first.');
+    });
+
+    m.wallBtn.addEventListener('click', function () {
+      var wall = global.SDACamWall;
+      if (!wall || typeof wall.open !== 'function') { setStatus('The camera wall is not loaded.'); return; }
+      if (!favourites().count()) { setStatus('Star a camera first: open one and press its star.'); return; }
+      wall.open();
+    });
+
     m.playableBox.addEventListener('change', function () {
       m.playableOnly = !!m.playableBox.checked;
       refresh(true);
@@ -941,6 +1190,9 @@
     try {
       viewer.camera.moveEnd.addEventListener(scheduleRefresh);
     } catch (e) { /* keep going */ }
+    try {
+      global.document.addEventListener('visibilitychange', onVisibility);
+    } catch (e) { /* keep going */ }
 
     buildChips();
     return m;
@@ -967,6 +1219,16 @@
     open: function (rid) { if (current) current.openCamera(rid); },
     close: function () { if (current) current.closeViewer(); },
     isOpen: function () { return !!(current && current.frame); },
+    // For the camera wall (camwall.js): the starred list, the same feed player
+    // the viewer uses, and one camera's full record.
+    favourites: function () { return favourites(); },
+    playFeed: playFeed,
+    fetchCamera: function (rid) { return fetchCamera(current ? current.ctx.api : '', rid); },
+    FAV_KEY: FAV_KEY,
+    MAX_FAVOURITES: MAX_FAVOURITES,
+    favRecord: favRecord,
+    createFavourites: createFavourites,
+    memoryStorage: memoryStorage,
     GROUPS: GROUPS,
     LAYOUT: LAYOUT,
     DETAIL_ALT_M: DETAIL_ALT_M,

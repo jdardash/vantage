@@ -36,16 +36,24 @@ from sda.ratelimit import (
 )
 from sda.routes.agent import router as agent_router
 from sda.routes.analysis import router as analysis_router
+from sda.routes.aviation import router as aviation_router
 from sda.routes.cameras import router as cameras_router
+from sda.routes.conflict import router as conflict_router
 from sda.routes.conjunctions import router as conjunctions_router
 from sda.routes.eonet import router as eonet_router
 from sda.routes.history import router as history_router
+from sda.routes.infra import router as infra_router
+from sda.routes.intel import router as intel_router
+from sda.routes.maritime import router as maritime_router
 from sda.routes.ops import router as ops_router
+from sda.routes.orbitviz import router as orbitviz_router
 from sda.routes.passes import router as passes_router
 from sda.routes.pc import router as pc_router
 from sda.routes.peaks import router as peaks_router
+from sda.routes.sanctions import router as sanctions_router
 from sda.routes.satcat import router as satcat_router
 from sda.routes.satellites import router as satellites_router
+from sda.routes.search import router as search_router
 from sda.routes.space import router as space_router
 from sda.routes.summit import router as summit_router
 from sda.routes.system import router as system_router
@@ -928,6 +936,10 @@ async def lifespan(app: FastAPI):
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+    # The maritime sampler stops itself when idle; this ends it with the app.
+    from sda import maritime
+
+    maritime.stop_sampler()
 
 
 # --- App setup ---
@@ -1012,6 +1024,14 @@ app.include_router(summit_router)
 app.include_router(peaks_router)
 app.include_router(satcat_router)
 app.include_router(weather_router)
+app.include_router(sanctions_router)
+app.include_router(maritime_router)
+app.include_router(intel_router)
+app.include_router(aviation_router)
+app.include_router(infra_router)
+app.include_router(orbitviz_router)
+app.include_router(search_router)
+app.include_router(conflict_router)
 
 
 def run() -> None:
