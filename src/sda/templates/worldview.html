@@ -616,10 +616,14 @@
         <button class="mode-btn" data-basemap="streets">STREETS</button>
         <button class="mode-btn" data-basemap="topo">TOPO</button>
         <button class="mode-btn" data-basemap="dark">DARK</button>
+        <button class="mode-btn" data-basemap="photoreal" style="grid-column: span 2;" title="Photorealistic 3D cities: Google's tiles with a free Cesium ion token, OpenStreetMap buildings without one">PHOTOREAL 3D</button>
       </div>
       <div id="basemap-credit" style="margin-top: 6px; font-size: 9px; opacity: 0.6; min-height: 2.6em;"></div>
     </div>
   </div>
+
+  <!-- 3D city: Google Photorealistic 3D Tiles or OpenStreetMap buildings (static/js/buildings3d.js) -->
+  <div id="ext-buildings3d"></div>
 
   <!-- Satellite search (static/js/satsearch.js) -->
   <div id="ext-satsearch"></div>
@@ -1232,6 +1236,7 @@
 <script src="static/js/tour.js"></script>
 <script src="static/js/presentation.js"></script>
 <script src="static/js/conflict.js"></script>
+<script src="static/js/buildings3d.js"></script>
 
 <script>
 // ============================================================
@@ -1512,17 +1517,34 @@ var BASEMAPS = {
         { provider: esriTiles('Canvas/World_Dark_Gray_Reference', 16, 'Esri dark gray reference') }
       ];
     }
+  },
+  // Cities in 3D (static/js/buildings3d.js): Google's photorealistic tiles when
+  // the server has a Google or Cesium ion account set, which hide the globe
+  // surface; else OpenStreetMap buildings standing on this Esri imagery.
+  photoreal: {
+    label: 'PHOTOREALISTIC 3D (GOOGLE TILES WHEN SET UP, ELSE OPENSTREETMAP BUILDINGS)',
+    credit: 'Esri, Maxar, Earthstar Geographics; OpenStreetMap contributors (buildings)',
+    lighting: false,
+    city: true,
+    layers: function() {
+      return [{ provider: esriImagery() }];
+    }
   }
 };
 var DEFAULT_BASEMAP = 'earth';
 var currentBasemap = DEFAULT_BASEMAP;
 var basemapLayers = [];
-var basemapLocked = false;
+
+// The photorealistic choice hands the city to static/js/buildings3d.js; every
+// other basemap takes it back (Google tiles off, globe surface on).
+function setCityMode(on) {
+  if (typeof SDABuildings3D !== 'undefined') SDABuildings3D.setCityMode(on);
+}
 
 function setBasemap(name, quiet) {
   // name can come straight from a share link, and "constructor" is a member of
   // every object, so only the registry's own entries count.
-  if (basemapLocked || !Object.prototype.hasOwnProperty.call(BASEMAPS, name)) return;
+  if (!Object.prototype.hasOwnProperty.call(BASEMAPS, name)) return;
   var entry = BASEMAPS[name];
   basemapLayers.forEach(function(layer) { viewer.imageryLayers.remove(layer, true); });
   // Inserted from index 0 up, which keeps the basemap underneath any imagery added later.
@@ -1544,23 +1566,12 @@ function setBasemap(name, quiet) {
   var credit = $('basemap-credit');
   if (credit) credit.textContent = 'Imagery: ' + entry.credit;
   if (!quiet) addIntelItem('Basemap: ' + entry.label);
+  setCityMode(!!entry.city);
 }
 
 function cycleBasemap() {
   var names = Object.keys(BASEMAPS);
   setBasemap(names[(names.indexOf(currentBasemap) + 1) % names.length]);
-}
-
-// Google's photorealistic tiles replace the globe surface, so while they are
-// loaded no basemap is on screen and the switch would only misreport.
-function lockBasemap(source) {
-  basemapLocked = true;
-  document.querySelectorAll('.mode-btn[data-basemap]').forEach(function(b) {
-    b.classList.remove('active');
-    b.disabled = true;
-  });
-  var credit = $('basemap-credit');
-  if (credit) credit.textContent = 'Imagery: ' + source;
 }
 
 // ===== EXTENSION MODULES =====
@@ -1599,7 +1610,8 @@ var EXTENSIONS = [
   { global: 'SDAClouds', mount: 'ext-clouds' },
   { global: 'SDATour', mount: 'ext-tour' },
   { global: 'SDAPresent', mount: 'ext-presentation' },
-  { global: 'SDAConflict', mount: 'ext-conflict' }
+  { global: 'SDAConflict', mount: 'ext-conflict' },
+  { global: 'SDABuildings3D', mount: 'ext-buildings3d' }
 ];
 
 function wirePanelCollapse(h3) {
@@ -5240,18 +5252,12 @@ async function checkConfig() {
         addIntelItem('Cesium Ion terrain loaded');
       } catch (e) { /* terrain not available */ }
     }
-    if (config.google_maps_api_key) {
-      try {
-        var g3dTiles = await Cesium.Cesium3DTileset.fromUrl(
-          'https://tile.googleapis.com/v1/3dtiles/root.json?key=' + config.google_maps_api_key,
-          { showCreditsOnScreen: true }
-        );
-        viewer.scene.primitives.add(g3dTiles);
-        viewer.scene.globe.show = false; // tiles cover the full globe; avoid z-fighting
-        lockBasemap('Google Photorealistic 3D Tiles');
-        addIntelItem('Google Photorealistic 3D Tiles loaded');
-      } catch (e) { /* 3D tiles not available */ }
-    }
+    // Google's Photorealistic 3D Tiles load when the PHOTOREAL 3D basemap is
+    // chosen (button, I key or bm=photoreal in a link), through the Google key
+    // or, failing that, the ion token: one loader, in static/js/buildings3d.js.
+    // They are not loaded at start, so a page load spends none of either
+    // free monthly allowance.
+    if (typeof SDABuildings3D !== 'undefined') SDABuildings3D.setConfig(config);
   } catch (e) { /* no config endpoint */ }
 }
 

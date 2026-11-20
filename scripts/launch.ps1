@@ -84,7 +84,7 @@ $WhatIfPreference = $false
 # keyless feeds, a local Ollama model for the agent).
 $Keys = @(
     @{ Name = 'GOOGLE_MAPS_API_KEY';   Cost = 'PAID'; Secret = $true;  Unlocks = 'Google Photorealistic 3D Tiles on the globe';   From = 'console.cloud.google.com: needs billing, enable "Map Tiles API", then Credentials' }
-    @{ Name = 'CESIUM_ION_TOKEN';      Cost = 'free'; Secret = $true;  Unlocks = 'Cesium World Terrain on the globe';             From = 'ion.cesium.com/tokens (free community account)' }
+    @{ Name = 'CESIUM_ION_TOKEN';      Cost = 'free'; Secret = $true;  Unlocks = 'Cesium World Terrain, and Google Photorealistic 3D cities through ion (PHOTOREAL 3D)'; From = 'ion.cesium.com/tokens (free community account)' }
     @{ Name = 'ANTHROPIC_API_KEY';     Cost = 'PAID'; Secret = $true;  Unlocks = 'agent chat (POST /agent/chat) through Claude';  From = 'console.anthropic.com, billed per token' }
     @{ Name = 'OPENAI_API_KEY';        Cost = 'PAID'; Secret = $true;  Unlocks = 'agent chat through an OpenAI-compatible API';   From = 'platform.openai.com, OpenRouter or Groq, billed per token' }
     @{ Name = 'FIRMS_MAP_KEY';         Cost = 'free'; Secret = $true;  Unlocks = 'NASA fire detections feed';                     From = 'firms.modaps.eosdis.nasa.gov/api/map_key' }

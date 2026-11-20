@@ -37,6 +37,7 @@ from sda.ratelimit import (
 from sda.routes.agent import router as agent_router
 from sda.routes.analysis import router as analysis_router
 from sda.routes.aviation import router as aviation_router
+from sda.routes.buildings import router as buildings_router
 from sda.routes.cameras import router as cameras_router
 from sda.routes.conflict import router as conflict_router
 from sda.routes.conjunctions import router as conjunctions_router
@@ -1032,6 +1033,7 @@ app.include_router(infra_router)
 app.include_router(orbitviz_router)
 app.include_router(search_router)
 app.include_router(conflict_router)
+app.include_router(buildings_router)
 
 
 def run() -> None:

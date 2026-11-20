@@ -1034,7 +1034,7 @@ def test_init_mounts_panels_toolbar_and_floating_widgets(ran):
     assert r["panels"] == [
         ["Map tools", "panel"], ["Map view", "panel collapsed"], ["Saved views", "panel collapsed"],
     ]
-    assert r["tools"] == ["DIST", "AREA", "PIN", "LINE", "POLY", "RING", "PROF", "LOS"]
+    assert r["tools"] == ["DIST", "AREA", "HGT", "PIN", "LINE", "POLY", "RING", "PROF", "LOS"]
     assert r["untitled"] == []
     assert r["buttonCount"] > 30
     assert r["readout"] == 1 and r["readout2"] == 1
@@ -1101,6 +1101,44 @@ def test_measure_session_persists_and_restores_viewer(ran):
     assert any(e.endswith("-0") for e in r["ents"])
     assert r["count"] == 1 and r["typedIgnored"] is True
     assert r["list"] == 1
+
+
+scenario("height_measure", r"""
+  var s = start();
+  var mt = s.mt;
+  var sc = s.ctx.viewer.scene;
+  // OSM buildings stand on a visible globe; the height tool reads the drawn surface.
+  var meshCalls = 0;
+  var surface = 480;
+  sc.pickPositionSupported = true;
+  sc.pickPosition = function (pos) { meshCalls++; return { lon: -10 + pos.x * 0.02, lat: 6 - pos.y * 0.02, h: surface }; };
+  byText(s.ctx.mount, 'HGT').click();
+  var first = mt.ui.live.textContent;
+  act(mt, 'LEFT_CLICK', at(lonX(1), latY(1)));
+  surface = 505.4;
+  mt.state.lastMove = 0;
+  act(mt, 'MOUSE_MOVE', at(lonX(1), latY(1)));
+  var live = mt.ui.live.textContent;
+  act(mt, 'LEFT_CLICK', at(lonX(1), latY(1)));   // the roof edge straight above the foot
+  var stored = JSON.parse(localStorage.getItem(window.SDAMapTools.STORE_KEYS.drawings));
+  var after = { active: window.SDAMapTools.isActive(), status: mt.ui.status.textContent };
+  // The other measures keep reading the globe, not the mesh.
+  var before = meshCalls;
+  byText(s.ctx.mount, 'DIST').click();
+  act(mt, 'LEFT_CLICK', at(lonX(2), latY(2)));
+  mt.cancel();
+  return { first: first, live: live, after: after, distMesh: meshCalls - before,
+    stored: stored.map(function (d) { return [d.kind, d.tool, d.points.length, d.name]; }) };
+""")
+
+
+def test_height_measure_reads_the_mesh(ran):
+    r = ran["height_measure"]
+    assert r["first"] == "Click the foot, then the top."
+    assert r["live"] == "Height 25 m up"
+    assert r["stored"] == [["line", "measure", 2, "Height 25 m up"]]
+    assert r["after"] == {"active": False, "status": "Height 25 m up"}
+    assert r["distMesh"] == 0
 
 
 scenario("area_pin_ring_popup", r"""

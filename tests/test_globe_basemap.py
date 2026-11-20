@@ -43,7 +43,8 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 function makeWorld() {
   const layers = [];
   const log = { intel: [], destroyed: [] };
-  const buttons = ['earth', 'daynight', 'night', 'hires', 'hybrid', 'streets', 'topo', 'dark']
+  const buttons = ['earth', 'daynight', 'night', 'hires', 'hybrid', 'streets', 'topo', 'dark',
+    'photoreal']
     .map(function (name) {
     const classes = new Set(name === 'earth' ? ['active'] : []);
     return {
@@ -173,12 +174,16 @@ names.forEach(function (name) {
 
 (function () {
   const w = makeWorld();
-  w.box.setBasemap('hires');
-  w.box.lockBasemap('Google Photorealistic 3D Tiles');
-  const locked = w.snapshot();
+  const calls = [];
+  w.box.SDABuildings3D = { setCityMode: function (on) { calls.push(on); } };
+  w.box.setBasemap('photoreal');
+  const city = w.snapshot();
   w.box.setBasemap('earth');
-  w.box.cycleBasemap();
-  out.lock = { locked: locked, after: w.snapshot() };
+  out.city = { city: city, after: w.snapshot(), calls: calls };
+  // Before the 3D module is on the page the switch still works.
+  const bare = makeWorld();
+  bare.box.setBasemap('photoreal');
+  out.city.bare = bare.snapshot().current;
 })();
 
 process.stdout.write(JSON.stringify(out));
@@ -207,7 +212,9 @@ def run() -> dict:
     return json.loads(done.stdout)
 
 
-ALL_BASEMAPS = ["earth", "daynight", "night", "hires", "hybrid", "streets", "topo", "dark"]
+ALL_BASEMAPS = [
+    "earth", "daynight", "night", "hires", "hybrid", "streets", "topo", "dark", "photoreal",
+]
 ESRI_TILES = "https://services.arcgisonline.com/arcgis/rest/services/"
 
 
@@ -246,7 +253,7 @@ def test_no_basemap_names_a_tiling_scheme_or_a_credential(run):
 
 def test_each_basemap_stacks_the_layers_it_promises(run):
     each = run["each"]
-    assert [len(each[name]["layers"]) for name in run["names"]] == [2, 3, 1, 1, 3, 1, 1, 2]
+    assert [len(each[name]["layers"]) for name in run["names"]] == [2, 3, 1, 1, 3, 1, 1, 2, 1]
 
     assert "BlueMarble_ShadedRelief_Bathymetry" in each["earth"]["layers"][0]["url"]
     assert each["earth"]["layers"][0]["url"].endswith(".jpeg")
@@ -279,6 +286,7 @@ def test_only_the_day_night_basemap_lights_the_globe(run):
         "streets": False,
         "topo": False,
         "dark": False,
+        "photoreal": False,
     }
 
 
@@ -294,7 +302,7 @@ def test_choosing_a_basemap_updates_the_button_the_credit_and_the_feed(run):
 
 def test_esri_basemaps_ride_the_default_grid_with_labels_on_top(run):
     each = run["each"]
-    for name in ("hires", "hybrid", "streets", "topo", "dark"):
+    for name in ("hires", "hybrid", "streets", "topo", "dark", "photoreal"):
         for layer in each[name]["layers"]:
             assert layer["url"].startswith(ESRI_TILES), (name, layer["url"])
             assert layer["url"].endswith("/MapServer/tile/{z}/{y}/{x}"), layer["url"]
@@ -333,14 +341,18 @@ def test_the_i_key_walks_every_basemap_and_wraps(run):
     assert run["cycle"] == ALL_BASEMAPS[1:] + ["earth", "daynight"]
 
 
-def test_google_tiles_take_the_basemap_switch_out_of_play(run):
-    """Google's photorealistic tiles replace the globe surface. The buttons
-    must not go on claiming a NASA basemap that is no longer on screen."""
-    locked, after = run["lock"]["locked"], run["lock"]["after"]
-    assert locked["active"] == []
-    assert locked["disabled"] == ALL_BASEMAPS
-    assert locked["credit"] == "Imagery: Google Photorealistic 3D Tiles"
-    assert after == locked, "a locked switch ignores both the buttons and the I key"
+def test_photoreal_hands_the_city_to_the_3d_module(run):
+    """PHOTOREAL 3D turns static/js/buildings3d.js on (Google's tiles or OSM
+    buildings over Esri imagery); any other basemap turns it off again, so the
+    switch is never locked and the active button always names what is shown."""
+    city = run["city"]
+    assert city["city"]["current"] == "photoreal" and city["city"]["active"] == ["photoreal"]
+    assert city["city"]["disabled"] == []
+    assert "World_Imagery" in city["city"]["layers"][0]["url"]
+    assert "OpenStreetMap" in city["city"]["credit"]
+    assert city["after"]["current"] == "earth"
+    assert city["calls"] == [True, False]
+    assert city["bare"] == "photoreal"
 
 
 def test_browser_shortcuts_do_not_trigger_globe_keys():

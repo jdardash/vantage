@@ -803,9 +803,11 @@ _LONDON_CAMERAS_URL = "https://api.tfl.gov.uk/Place/Type/JamCam"
 def worldview_config():
     """Expose optional map tokens read from environment variables.
 
-    CESIUM_ION_TOKEN enables Cesium World Terrain; GOOGLE_MAPS_API_KEY
-    enables Google Photorealistic 3D Tiles. Both are optional; the globe
-    works without them.
+    CESIUM_ION_TOKEN enables Cesium World Terrain and, on the PHOTOREAL 3D
+    basemap, Google Photorealistic 3D Tiles through Cesium ion (free
+    monthly allowance); GOOGLE_MAPS_API_KEY loads the same tiles directly.
+    Both are optional; without them the city view extrudes OpenStreetMap
+    buildings from /api/buildings.
     """
     return {
         "cesium_ion_token": os.environ.get("CESIUM_ION_TOKEN") or None,

@@ -129,6 +129,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 | `tests/data/cara/` | [nasa/CARA_Analysis_Tools](https://github.com/nasa/CARA_Analysis_Tools) | NASA Open Source Agreement 1.3 | 53 reference CDMs, the `PcMethodTestConjunctions` values and the Alfano 2009 cases, verbatim, with `NOTICE.md` and one agreement PDF alongside. Imported by `scripts/import_cara_fixtures.py` |
 | `src/sda/templates/static/data/sky.json` | [ofrohn/d3-celestial](https://github.com/ofrohn/d3-celestial) `data/` at 7e720a3 | BSD-3-Clause (notice above) | Hipparcos stars to magnitude 5.5 (2,851), proper names to magnitude 3 (156), the IAU constellation lines (150 strips) and label positions (89), rounded and re-packed by `scripts/build_sky_data.py`; the file carries its source and license fields |
 | `src/sda/templates/static/models/airplane.glb`, `jet.glb`, `atr72.glb`, `c172.glb`, `bell206.glb`, `mq9.glb` | gev-worldcams `public/models` at 5804ba8; originals on Sketchfab by zairiq-123 (boeing 747), Nick the Name (Private Jet), Oyan3D (ATR 72 - 600), e737 (Cessna 172), terran4627 (Bell 206 JetRanger) and IProZenoN (MQ-9) | CC BY 4.0 | Copied unchanged; `static/models/NOTICE.txt` carries the links. The ISS, Hubble, satellite and ship models are our own, built by `scripts/build_globe_models.py` |
+| `tests/data/overpass_buildings_kano.json` | OpenStreetMap, through the Overpass API on 2026-11-20 (`osm3s` timestamp 2026-11-20T18:32:05Z) | ODbL 1.0, notice kept in the file | 40 building ways in Kano, Nigeria, trimmed from one live answer for the offline building tests |
 
 ## Runtime services and libraries loaded by the page
 
@@ -196,3 +197,5 @@ These are fetched by the browser or proxied by the server at run time; none is b
 | Political violence and protest events (optional) | ACLED, only when the user sets `ACLED_EMAIL` and `ACLED_PASSWORD` | The user's own ACLED account terms |
 | A front-lines route beside a conflict feed | simplifaisoul/osiris (MIT), idea only | Ours, no code copied |
 | What a planet or the Moon is (diameter, length of year) on the sky view card | NASA planetary and lunar fact sheets | Public, credit to NASA |
+| Building footprints, heights and levels for the PHOTOREAL 3D basemap | OpenStreetMap through the Overpass API (`overpass-api.de`), through `GET /api/buildings`, one request a second at most and each box cached 24 h | ODbL data, credited on screen; Overpass usage policy |
+| Google Photorealistic 3D Tiles for the PHOTOREAL 3D basemap | Google Map Tiles API, directly with `GOOGLE_MAPS_API_KEY` or through Cesium ion asset 2275207 with `CESIUM_ION_TOKEN`; loaded only while that basemap is chosen | Google Map Tiles API terms; Google and data-provider credits shown on screen by Cesium |

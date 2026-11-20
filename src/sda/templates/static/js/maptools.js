@@ -1984,6 +1984,8 @@
       title: 'Measure distance and bearing: click points, right-click, double-click or Enter to finish' },
     { id: 'area', label: 'AREA', kind: 'polygon', tag: 'measure', min: 3,
       title: 'Measure area and perimeter: click corners, right-click, double-click or Enter to finish' },
+    { id: 'height', label: 'HGT', kind: 'line', tag: 'measure', min: 2, max: 2,
+      title: 'Measure a height: click the foot, then the top (a roof, a tower, the 3D city mesh)' },
     { id: 'pin', label: 'PIN', kind: 'pin', tag: '', min: 1,
       title: 'Drop a pin at each click, named from the Label box (Esc to stop)' },
     { id: 'line', label: 'LINE', kind: 'line', tag: '', min: 2,
@@ -2326,12 +2328,14 @@
       var cv = scene.canvas || {};
       return { w: cv.clientWidth || cv.width || 0, h: cv.clientHeight || cv.height || 0 };
     }
-    function pickCartesian(pos) {
+    // onMesh: the height tool wants the surface actually drawn (3D tiles, extruded
+    // buildings), which scene.pickPosition reads from the depth buffer.
+    function pickCartesian(pos, onMesh) {
       if (!pos) return null;
       var hit = null;
       var globe = scene.globe;
       try {
-        if (globe && globe.show === false && scene.pickPositionSupported && typeof scene.pickPosition === 'function') {
+        if (globe && (globe.show === false || onMesh) && scene.pickPositionSupported && typeof scene.pickPosition === 'function') {
           hit = scene.pickPosition(pos);
         }
         if (!hit && globe && globe.show !== false && typeof camera.getPickRay === 'function' && typeof globe.pick === 'function') {
@@ -2344,8 +2348,8 @@
       }
       return hit || null;
     }
-    function pickLatLon(pos) {
-      var c = pickCartesian(pos);
+    function pickLatLon(pos, onMesh) {
+      var c = pickCartesian(pos, onMesh);
       if (!c) return null;
       var g = C.Cartographic.fromCartesian(c);
       if (!g) return null;
@@ -2641,6 +2645,10 @@
       var units = prefs.units;
       if (t.kind === 'pin') return 'Click to drop a pin. Esc to stop.';
       if (t.kind === 'circle') return 'Click to place rings: ' + (parseRadii(ui.rings.value, units) || []).map(function (r) { return formatDistance(r, units); }).join(' / ');
+      if (t.id === 'height') {
+        var rise = s.heights.length && m.cursor && isNum(m.cursor.height) ? m.cursor.height - s.heights[0] : null;
+        return rise === null ? 'Click the foot, then the top.' : heightText(rise, units);
+      }
       if (pts.length < 2) return t.id === 'los' ? 'Click the observer, then the target.' : 'Click the first point.';
       var a = pts[pts.length - 2];
       var b = pts[pts.length - 1];
@@ -2724,7 +2732,7 @@
       if (!t) return false;
       if (m.session) endSession();
       closePopup();
-      m.session = { tool: t, points: [], entities: [], vertices: [], label: '' };
+      m.session = { tool: t, points: [], heights: [], entities: [], vertices: [], label: '' };
       suppressDoubleClick(true);
       setBodyDrawing(true);
       updateToolButtons();
@@ -2766,13 +2774,21 @@
       var s = m.session;
       if (!s || !s.points.length) return false;
       s.points.pop();
+      s.heights.pop();
       var v = s.vertices.pop();
       if (v) { try { ds.entities.remove(v); } catch (err) { /* gone */ } }
       updateLive();
       return true;
     }
 
-    function nameFor(t, pts, label) {
+    function measuringHeight() { return !!(m.session && m.session.tool.id === 'height'); }
+
+    // The vertical difference between two picked points, whichever was clicked first.
+    function heightText(rise, units) {
+      return 'Height ' + formatDistance(Math.abs(rise), units) + (rise >= 0 ? ' up' : ' down');
+    }
+
+    function nameFor(t, pts, label, heights) {
       var u = prefs.units;
       var prefix = label ? label + ': ' : '';
       if (t.id === 'dist') {
@@ -2780,6 +2796,7 @@
         return prefix + formatDistance(len, u) + (pts.length === 2 ? ' ' + formatBearing(initialBearing(pts[0][1], pts[0][0], pts[1][1], pts[1][0])) : '');
       }
       if (t.id === 'area') return prefix + formatArea(polygonArea(pts), u);
+      if (t.id === 'height') return prefix + heightText(heights[1] - heights[0], u);
       if (t.id === 'line') return label || 'Line ' + formatDistance(pathLength(pts), u);
       if (t.id === 'poly') return label || 'Polygon ' + formatArea(polygonArea(pts), u);
       if (t.id === 'profile') return (label || 'Profile') + ' ' + formatDistance(pathLength(pts), u);
@@ -2798,7 +2815,7 @@
       var pts = s.points.slice();
       var label = cleanText(ui.label.value, 80);
       endSession();
-      var saved = store.add({ kind: t.kind, tool: t.tag, color: sessionColor(), points: pts, name: nameFor(t, pts, label) });
+      var saved = store.add({ kind: t.kind, tool: t.tag, color: sessionColor(), points: pts, name: nameFor(t, pts, label, s.heights) });
       if (!saved) { status('That drawing could not be saved.'); return null; }
       renderDrawing(saved);
       refreshList();
@@ -2843,9 +2860,14 @@
       if (t.kind === 'circle') { addRings(p.lat, p.lon); return true; }
       var ll = [round7(p.lon), round7(p.lat)];
       var last = s.points[s.points.length - 1];
-      if (last && geodesicDistance(last[1], last[0], ll[1], ll[0]) < 0.5) return false;
+      // The second click of a double-click lands on the first point and is dropped;
+      // for a height, a roof edge straight above its foot is a different point.
+      var h = isNum(p.height) ? p.height : 0;
+      if (last && geodesicDistance(last[1], last[0], ll[1], ll[0]) < 0.5 &&
+          (t.id !== 'height' || Math.abs(h - s.heights[s.heights.length - 1]) < 0.5)) return false;
       if (s.points.length >= MAX_POINTS) return false;
       s.points.push(ll);
+      s.heights.push(h);
       addVertex(ll);
       if (t.max && s.points.length >= t.max) finish();
       else updateLive();
@@ -3615,13 +3637,13 @@
       var now = Date.now();
       if (now - m.lastMove < 40) return;
       m.lastMove = now;
-      m.cursor = pickLatLon(mv && mv.endPosition);
+      m.cursor = pickLatLon(mv && mv.endPosition, measuringHeight());
       updateReadout(m.cursor);
       if (m.session) updateLive();
     }, T.MOUSE_MOVE);
     handler.setInputAction(function (ev) {
       if (!m.session) return;
-      var p = pickLatLon(ev && ev.position);
+      var p = pickLatLon(ev && ev.position, measuringHeight());
       if (!p) { status('That click missed the globe.'); return; }
       addPoint(p);
     }, T.LEFT_CLICK);
