@@ -566,13 +566,16 @@ ephemeris screening (5), are all data gaps first. Palantir has no public SDA
 product; its published strength is fusing many sources into a case file, which
 is gaps 9 and 10 here, and nothing about it was run.
 
-Gap 4 has a first half in progress and held out of this commit: a rewrite of the
-coarse screen so that no close approach can fall between two samples. The
-safety reviewer passed the first two rounds' fixes and returned REVISE on the
-third, on decayed SGP4 states whose reported speed understates how fast the
-position moves. It goes in only on a PASS.
+Gap 4's first half is in (2026-11-20): a rewrite of the coarse screen so that no
+close approach can fall between two samples. An interval is kept when the two
+objects' straight chords come within the threshold plus the linear-interpolation
+error bound, so the margin follows the physics instead of a fixed multiple. On
+2,000 objects over 6 h it finds 282 of the 282 approaches a dense 1 s reference
+finds (the old screen found 67), and the full pipeline went from 84.5 s to 2.2 s.
+The safety reviewer returned PASS on the tenth round. The ninth round's REVISE was a
+0.29 km approach lost to a last-bit timing difference between two paths.
 
-Next, in order: gap 4's screening volumes once the recall work passes, then
+Next, in order: gap 4's screening volumes, then
 gap 2 through CDM covariances already ingested (`cdm.py`), then gap 8's reentry
 board on the globe, which needs nothing new from upstream.
 
