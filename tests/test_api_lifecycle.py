@@ -202,6 +202,26 @@ def test_fetch_live_f107_observed_flux(monkeypatch):
     assert api._live_f107 == 142.5
 
 
+def test_fetch_live_f107_takes_newest_time_tag(monkeypatch):
+    """SWPC serves f107_cm_flux.json newest first (checked 2026-11-19), so the
+    last row is the oldest reading; the newest time_tag must win."""
+    api._live_f107 = 150.0
+    rows = [
+        {"time_tag": "2026-11-19T22:00:00", "flux": 106.0},
+        {"time_tag": "2026-11-19T20:00:00", "flux": 107.0},
+        {"time_tag": "2026-10-21T20:00:00", "flux": 160.0},
+    ]
+
+    def handler(url):
+        if url == api.NOAA_F107_OBSERVED_URL:
+            return FakeResponse(200, json_data=rows)
+        return FakeResponse(500)
+
+    monkeypatch.setattr(api.httpx, "AsyncClient", make_fake_client(handler))
+    asyncio.run(api._fetch_live_f107())
+    assert api._live_f107 == 106.0
+
+
 def test_fetch_live_f107_predicted_fallback(monkeypatch):
     api._live_f107 = 150.0
     now_str = datetime.now(UTC).strftime("%Y-%m")

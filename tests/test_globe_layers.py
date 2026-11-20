@@ -263,16 +263,20 @@ ALERTS = {  # from handler (upstream was down when probed)
     "source": "NOAA National Weather Service (US only)",
 }
 
-GDELT = {  # from handler (upstream was down when probed)
+GDELT = {  # from handler (gdelt_places over the event export)
     "events": [
-        {"name": "Washington, District of Columbia, United States", "count": 42,
-         "lat": 38.9, "lon": -77.0},
-        {"name": "", "count": 7, "lat": 51.5, "lon": -0.12},
+        {"name": "Washington, District of Columbia, United States", "lat": 38.9, "lon": -77.0,
+         "count": 42, "events": 5, "conflict": 2, "source_url": "https://example.org/a",
+         "date": "2026-11-19T05:15:00Z", "event": "Make public statement", "tone": -2.25},
+        {"name": "", "lat": 51.5, "lon": -0.12, "count": 7, "events": 1, "conflict": 0,
+         "source_url": "javascript:alert(1)", "date": "", "event": "", "tone": 0.0},
     ],
     "count": 2,
-    "query": "satellite",
-    "timespan": "24H",
-    "source": "GDELT Project GEO 2.1",
+    "raw_events": 6,
+    "query": "",
+    "minutes": 60,
+    "newest": "2026-11-19T05:15:00Z",
+    "source": "GDELT Project 2.0 event export",
 }
 
 FIRES = {  # from handler (key absent when probed)
@@ -333,8 +337,8 @@ AIS_NO_KEY = {  # real
     "error": "AISSTREAM_API_KEY is not set on the server",
 }
 ALERTS_DOWN = {"alerts": [], "count": 0, "error": "api.weather.gov unavailable"}  # real
-GDELT_DOWN = {  # real
-    "events": [], "count": 0, "query": "satellite", "error": "GDELT unavailable",
+GDELT_DOWN = {  # from handler
+    "events": [], "count": 0, "query": "", "error": "GDELT unavailable",
 }
 RADIO_DOWN = {"stations": [], "count": 0, "error": "Radio Browser unavailable"}  # from handler
 LAUNCHES_DOWN = {"launches": [], "count": 0, "error": "Launch Library unavailable"}  # real shape
@@ -411,8 +415,11 @@ EXPECTED = {
     ],
     "gdelt": [
         ("Washington, District of Columbia, United States", 38.9, -77.0, 42, [
-            ["ARTICLES", "42"]]),
-        ("Unnamed place", 51.5, -0.12, 7, [["ARTICLES", "7"]]),
+            ["ARTICLES", "42"], ["EVENTS", "5"], ["TOP EVENT", "Make public statement"],
+            ["CONFLICT EVENTS", "2"], ["TONE", "-2.3"], ["LATEST (UTC)", "2026-11-19T05:15:00Z"],
+            ["ARTICLE", "https://example.org/a"]]),
+        # A non-http source_url is never shown, and a zero conflict count is left out.
+        ("Unnamed place", 51.5, -0.12, 7, [["ARTICLES", "7"], ["EVENTS", "1"], ["TONE", "0.0"]]),
     ],
     "fires": [
         ("Fire 2026-10-08 04:12 UTC", -33.5, 150.2, 12.3, [

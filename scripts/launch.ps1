@@ -48,6 +48,11 @@
 .PARAMETER NoBrowser
     Do not open the globe in the default browser.
 
+.PARAMETER NoCameraImport
+    Skip the one-time camera catalog import. Without the flag, a missing catalog
+    (cameras.sqlite under SDA_CAMERA_DIR, else %LOCALAPPDATA%\sda\cameras) is built
+    once before the server starts: about 100 MB downloaded from GitHub, a minute or two.
+
 .EXAMPLE
     .\scripts\launch.ps1 -SetKeys
 
@@ -60,7 +65,8 @@ param(
     [switch]$Status,
     [switch]$AllowPaid,
     [int]$Port = 0,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$NoCameraImport
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,11 +84,14 @@ $WhatIfPreference = $false
 # keyless feeds, a local Ollama model for the agent).
 $Keys = @(
     @{ Name = 'GOOGLE_MAPS_API_KEY';   Cost = 'PAID'; Secret = $true;  Unlocks = 'Google Photorealistic 3D Tiles on the globe';   From = 'console.cloud.google.com: needs billing, enable "Map Tiles API", then Credentials' }
-    @{ Name = 'CESIUM_ION_TOKEN';      Cost = 'free'; Secret = $true;  Unlocks = 'Cesium World Terrain on the globe';             From = 'ion.cesium.com/tokens (free community account)' }
+    @{ Name = 'CESIUM_ION_TOKEN';      Cost = 'free'; Secret = $true;  Unlocks = 'Cesium World Terrain, and Google Photorealistic 3D cities through ion (PHOTOREAL 3D)'; From = 'ion.cesium.com/tokens (free community account)' }
     @{ Name = 'ANTHROPIC_API_KEY';     Cost = 'PAID'; Secret = $true;  Unlocks = 'agent chat (POST /agent/chat) through Claude';  From = 'console.anthropic.com, billed per token' }
     @{ Name = 'OPENAI_API_KEY';        Cost = 'PAID'; Secret = $true;  Unlocks = 'agent chat through an OpenAI-compatible API';   From = 'platform.openai.com, OpenRouter or Groq, billed per token' }
     @{ Name = 'FIRMS_MAP_KEY';         Cost = 'free'; Secret = $true;  Unlocks = 'NASA fire detections feed';                     From = 'firms.modaps.eosdis.nasa.gov/api/map_key' }
-    @{ Name = 'AISSTREAM_API_KEY';     Cost = 'free'; Secret = $true;  Unlocks = 'ship positions feed';                           From = 'aisstream.io' }
+    @{ Name = 'AISSTREAM_API_KEY';     Cost = 'free'; Secret = $true;  Unlocks = 'ship positions feed, maritime chokepoints and dark ships'; From = 'aisstream.io' }
+    @{ Name = 'ADSBLOL_API_KEY';       Cost = 'free'; Secret = $true;  Unlocks = 'adsb.lol beyond 500 keyless requests a day (aviation intel)'; From = 'adsb.lol (optional; the overlay works without it)' }
+    @{ Name = 'ACLED_EMAIL';           Cost = 'free'; Secret = $false; Unlocks = 'ACLED political violence events on the conflict layer'; From = 'acleddata.com account (optional; the layer works without it)' }
+    @{ Name = 'ACLED_PASSWORD';        Cost = 'free'; Secret = $true;  Unlocks = 'pairs with ACLED_EMAIL';                        From = 'same account' }
     @{ Name = 'OPENSKY_CLIENT_ID';     Cost = 'free'; Secret = $false; Unlocks = 'authenticated OpenSky flights (higher limits)'; From = 'opensky-network.org account, API client' }
     @{ Name = 'OPENSKY_CLIENT_SECRET'; Cost = 'free'; Secret = $true;  Unlocks = 'pairs with OPENSKY_CLIENT_ID';                  From = 'same page as the client id' }
     @{ Name = 'SDA_SPACETRACK_USER';   Cost = 'free'; Secret = $false; Unlocks = 'Space-Track GP, TIP and CDM pulls';             From = 'space-track.org account' }
@@ -407,6 +416,17 @@ try {
         Write-Host "Restarting the server already on port $boundPort (PID $($choice.Replace.ProcessId))"
         Stop-Process -Id $choice.Replace.ProcessId -Force
         for ($i = 0; $i -lt 40 -and (Get-Listener $boundPort); $i++) { Start-Sleep -Milliseconds 250 }
+    }
+
+    if (-not $NoCameraImport) {
+        $camDir = [Environment]::GetEnvironmentVariable('SDA_CAMERA_DIR', 'Process')
+        if (-not $camDir) { $camDir = [Environment]::GetEnvironmentVariable('SDA_CAMERA_DIR', 'User') }
+        if (-not $camDir) { $camDir = Join-Path $env:LOCALAPPDATA 'sda\cameras' }
+        if (-not (Test-Path (Join-Path $camDir 'cameras.sqlite'))) {
+            Write-Host "No camera catalog in $camDir yet: importing it once (about 100 MB, -NoCameraImport skips this)"
+            & $Python -m sda.cameras import
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'Camera import failed; the CCTV layer will say so. The server starts anyway.' }
+        }
     }
 
     $server = Start-Process -FilePath $Python -ArgumentList '-m', 'sda.api' -WorkingDirectory $RepoRoot -NoNewWindow -PassThru

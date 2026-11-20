@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: sda
-          image: ghcr.io/jdardash/space-collision-predictor:latest
+          image: ghcr.io/jdardash/vantage:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

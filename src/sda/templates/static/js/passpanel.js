@@ -10,6 +10,11 @@
 // The pure helpers at the top need no DOM and are exported for the Node tests
 // in tests/test_globe_passpanel.py. init() is the only part that touches the
 // page.
+//
+// Each pass also gets a small polar sky chart (north up, east right, zenith in
+// the centre, horizon on the rim) drawn from the samples /passes returns with
+// include_samples. The idea comes from the polar plot in keeptrack.space and
+// gpredict; the code is written here.
 
 (function (global) {
   'use strict';
@@ -111,6 +116,7 @@
     if (o.hours != null) body.hours = o.hours;
     if (o.minElevationDeg != null) body.min_elevation_deg = o.minElevationDeg;
     if (o.start != null) body.start = o.start;
+    if (o.includeSamples) body.include_samples = true;
     return body;
   }
 
@@ -244,7 +250,8 @@
         },
         duration: formatDuration(p.duration_s),
         light: lightLabel(p),
-        partial: p.partial === true
+        partial: p.partial === true,
+        track: polarTrack(p.samples, POLAR_R)
       });
     });
     return rows;
@@ -341,6 +348,46 @@
   function kmToMetres(km) { return Math.round(km * 1e6) / 1e3; }
 
   // ---------------------------------------------------------------------
+  // Polar sky chart geometry
+  // ---------------------------------------------------------------------
+
+  var POLAR_R = 56;
+
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  // Chart coordinates of one look direction on a polar chart of radius r
+  // centred on (r, r): elevation 90 is the centre, 0 is the rim, azimuth runs
+  // clockwise from north at the top. Null below the horizon or for junk.
+  function polarPoint(azimuthDeg, elevationDeg, r) {
+    if (typeof azimuthDeg !== 'number' || typeof elevationDeg !== 'number' ||
+        !isFinite(azimuthDeg) || !isFinite(elevationDeg) || elevationDeg < 0) {
+      return null;
+    }
+    var rho = r * (90 - Math.min(90, elevationDeg)) / 90;
+    var a = azimuthDeg * Math.PI / 180;
+    return { x: round2(r + rho * Math.sin(a)), y: round2(r - rho * Math.cos(a)) };
+  }
+
+  // The above-horizon samples of one pass as chart points, in time order.
+  function polarTrack(samples, r) {
+    var points = [];
+    (Array.isArray(samples) ? samples : []).forEach(function (s) {
+      if (!s || typeof s !== 'object') return;
+      var pt = polarPoint(s.azimuth_deg, s.elevation_deg, r);
+      if (pt) points.push(pt);
+    });
+    return points;
+  }
+
+  // SVG path data through the points, or '' when there is no line to draw.
+  function polarPath(points) {
+    if (!Array.isArray(points) || points.length < 2) return '';
+    return points.map(function (pt, i) {
+      return (i ? 'L' : 'M') + pt.x + ' ' + pt.y;
+    }).join(' ');
+  }
+
+  // ---------------------------------------------------------------------
   // Panel (DOM)
   // ---------------------------------------------------------------------
 
@@ -374,7 +421,8 @@
     '.passpanel-line { display: flex; gap: 6px; }',
     '.passpanel-k { flex: 0 0 34px; font-size: 9px; letter-spacing: 1px;',
     '  color: var(--hud-dim, #7a5500); }',
-    '.passpanel-light { margin-top: 2px; font-size: 9px; color: var(--hud-dim, #7a5500); }'
+    '.passpanel-light { margin-top: 2px; font-size: 9px; color: var(--hud-dim, #7a5500); }',
+    '.passpanel-polar { display: block; margin: 6px auto 0; }'
   ].join('\n');
 
   function el(tag, className, content) {
@@ -390,6 +438,55 @@
     var style = el('style', '', CSS);
     style.id = STYLE_ID;
     doc.head.appendChild(style);
+  }
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function svgEl(tag, attrs) {
+    var node = global.document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { node.setAttribute(k, String(attrs[k])); });
+    return node;
+  }
+
+  // A small sky chart of one pass: rings at 0, 30 and 60 degrees elevation,
+  // compass letters, the track, a filled dot where it rises and an open one
+  // where it sets. Null when there is nothing to draw or no SVG support.
+  function polarPlot(points) {
+    var doc = global.document;
+    if (!doc || typeof doc.createElementNS !== 'function' || !polarPath(points)) return null;
+    var r = POLAR_R;
+    var pad = 11;
+    var size = 2 * (r + pad);
+    var svg = svgEl('svg', {
+      width: size, height: size, viewBox: (-pad) + ' ' + (-pad) + ' ' + size + ' ' + size,
+      'class': 'passpanel-polar', role: 'img', 'aria-label': 'Sky track of this pass'
+    });
+    [0, 30, 60].forEach(function (elev) {
+      svg.appendChild(svgEl('circle', {
+        cx: r, cy: r, r: round2(r * (90 - elev) / 90), fill: 'none',
+        stroke: elev ? 'rgba(255,176,0,0.16)' : 'rgba(255,176,0,0.4)', 'stroke-width': 1
+      }));
+    });
+    svg.appendChild(svgEl('line', { x1: r, y1: 0, x2: r, y2: 2 * r,
+      stroke: 'rgba(255,176,0,0.12)', 'stroke-width': 1 }));
+    svg.appendChild(svgEl('line', { x1: 0, y1: r, x2: 2 * r, y2: r,
+      stroke: 'rgba(255,176,0,0.12)', 'stroke-width': 1 }));
+    [['N', r, -3], ['E', 2 * r + 6, r + 3], ['S', r, 2 * r + 9], ['W', -6, r + 3]]
+      .forEach(function (c) {
+        var t = svgEl('text', { x: c[1], y: c[2], 'text-anchor': 'middle',
+          'font-size': 8, fill: '#a87800' });
+        t.textContent = c[0];
+        svg.appendChild(t);
+      });
+    svg.appendChild(svgEl('path', { d: polarPath(points), fill: 'none',
+      stroke: MARKER_COLOR, 'stroke-width': 1.6, 'stroke-linecap': 'round',
+      'stroke-linejoin': 'round' }));
+    var first = points[0];
+    var last = points[points.length - 1];
+    svg.appendChild(svgEl('circle', { cx: first.x, cy: first.y, r: 2.6, fill: MARKER_COLOR }));
+    svg.appendChild(svgEl('circle', { cx: last.x, cy: last.y, r: 2.6, fill: 'none',
+      stroke: MARKER_COLOR, 'stroke-width': 1.2 }));
+    return svg;
   }
 
   // The page's standard panel: <div class="panel"><h3>..</h3><div class="panel-body">..</div></div>
@@ -446,6 +543,8 @@
     if (row.partial) {
       block.appendChild(el('div', 'passpanel-light', 'Partial: cut off by the search window.'));
     }
+    var plot = polarPlot(row.track || []);
+    if (plot) block.appendChild(plot);
     return block;
   }
 
@@ -695,7 +794,8 @@
       var name = (sat && sat.name) ? sat.name : null;
 
       say('Loading passes...');
-      var passCall = post('/passes', buildPassRequest(noradId, checked.observer));
+      var passCall = post('/passes',
+        buildPassRequest(noradId, checked.observer, { includeSamples: true }));
       // Look angles are a bonus line: if they fail the pass list still shows.
       var lookCall = post('/lookangles', buildLookAnglesRequest(noradId, checked.observer));
 
@@ -768,6 +868,9 @@
     lookAnglesLine: lookAnglesLine,
     describeError: describeError,
     geolocationMessage: geolocationMessage,
-    zoneLabel: zoneLabel
+    zoneLabel: zoneLabel,
+    polarPoint: polarPoint,
+    polarTrack: polarTrack,
+    polarPath: polarPath
   };
 })(typeof window !== 'undefined' ? window : this);

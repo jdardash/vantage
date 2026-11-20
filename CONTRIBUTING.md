@@ -1,12 +1,12 @@
 # Contributing
 
-Thanks for your interest in contributing to the Space-Domain Awareness Collision Predictor!
+Thanks for your interest in contributing to Vantage!
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/jdardash/space-collision-predictor.git
-cd space-collision-predictor
+git clone https://github.com/jdardash/vantage.git
+cd vantage
 python -m venv .venv && source .venv/bin/activate  # .venv\Scripts\activate on Windows
 pip install -e ".[dev]"
 ```
@@ -36,7 +36,7 @@ Changes to risk classification thresholds (`conjunction.py:classify_risk`) or pr
 
 ## Reporting Issues
 
-Open an issue at [GitHub Issues](https://github.com/jdardash/space-collision-predictor/issues) with:
+Open an issue at [GitHub Issues](https://github.com/jdardash/vantage/issues) with:
 - What you expected vs. what happened
 - Steps to reproduce
 - Python version and OS

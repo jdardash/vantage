@@ -251,7 +251,7 @@ def render_html_report(
         f"<style>{_CSS}</style></head><body>"
         f"<h1>{_esc(title)}</h1>"
         f'<p class="meta">Generated {_esc(moment.isoformat())} by '
-        f"space-collision-predictor {_esc(__version__)} - {_esc(scope)}. "
+        f"Vantage {_esc(__version__)} - {_esc(scope)}. "
         "Positions are ECI (TEME) in km and km/s; SGP4 with the WGS72 gravity model.</p>"
         "<h2>Summary</h2>"
         f"{_summary_table(summary)}"
@@ -310,7 +310,7 @@ def render_pdf_report(
     pdf.multi_cell(
         0,
         5,
-        f"Generated {moment.isoformat()} by space-collision-predictor {__version__}\n"
+        f"Generated {moment.isoformat()} by Vantage {__version__}\n"
         f"{scope}. Positions are ECI (TEME) in km and km/s; SGP4 with WGS72.",
         new_x="LMARGIN",
         new_y="NEXT",

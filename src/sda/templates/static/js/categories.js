@@ -46,6 +46,25 @@
   // the per-record category array and is never written to.
   var SKIP = 255;
 
+  // ours: filters share the record's hidden flag. Each owns one bit of
+  // record.hideMask (this filter 1, the object dossier in dossier.js 2, orbit
+  // visuals in orbitviz.js 4) and the
+  // record is hidden while any bit is set, so one filter clearing never shows
+  // what another still hides. A flag set without a bit is cleared as before.
+  var HIDE_BIT = 1;
+
+  function setHidden(rec, out) {
+    var m = rec.hideMask | 0;
+    m = out ? (m | HIDE_BIT) : (m & ~HIDE_BIT);
+    rec.hideMask = m;
+    rec.hidden = m !== 0;
+  }
+
+  // What the record's flag should be once nothing forces it visible.
+  function restoreHidden(rec) {
+    rec.hidden = (rec.hideMask | 0) !== 0;
+  }
+
   // One RegExp from several literals, so a long rule can be written one clause
   // per line without a string-escaped pattern.
   function anyOf() {
@@ -289,12 +308,13 @@
       for (var i = 0; i < n; i++) {
         var c = cats[i];
         if (c === SKIP) continue;
-        sats[i].hidden = showAll ? false : mask[c] === 0;
+        setHidden(sats[i], showAll ? false : mask[c] === 0);
       }
       ui.forced = null;
       ui.forcedCat = -1;
-      if (showAll) return;
-      // A hidden category must never make the selected satellite invisible.
+      // A hidden category must never make the selected satellite invisible. With
+      // every category shown this still matters: another filter's bit (the
+      // dossier's) may hide it.
       var sel = ui.selectedId();
       var rec = sel === null ? null : ui.lookup(sel);
       if (rec && rec.hidden === true) {
@@ -395,7 +415,7 @@
       if (!rec) return;
       var changed = false;
       if (ui.forced && ui.forced !== rec && ui.mask[ui.forcedCat] === 0) {
-        ui.forced.hidden = true;
+        restoreHidden(ui.forced);
         changed = true;
       }
       if (ui.forced !== rec) {
@@ -427,7 +447,7 @@
         if (named && named !== ui.forced) return;
       }
       var hide = ui.mask[ui.forcedCat] === 0;
-      if (hide) ui.forced.hidden = true;
+      if (hide) restoreHidden(ui.forced);
       ui.forced = null;
       ui.forcedCat = -1;
       ui.paint();

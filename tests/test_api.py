@@ -26,6 +26,9 @@ def test_health():
     assert data["status"] == "ok"
     assert "stale_tles" in data
     assert "version" in data
+    source = data["live_data"]["catalog_source"]
+    assert "source" in source
+    assert isinstance(source["element_sets"], dict)
 
 
 def test_ingest_and_list():

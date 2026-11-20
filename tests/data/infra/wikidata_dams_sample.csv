@@ -1,0 +1,17 @@
+d,c,name,mul,cc,h,inc,river,tl
+http://www.wikidata.org/entity/Q7366120,Point(27.59138889 -25.40416667),Roodekoppies Dam,,ZA,25.0,,Crocodile River,gravity dam
+http://www.wikidata.org/entity/Q2551168,Point(12.8704 48.7617),,,DE,,,Isar,dam
+http://www.wikidata.org/entity/Q224717,Point(125.1993 38.6935),Nampo Dam,,KP,,1986-01-01T00:00:00Z,Taedong River,levee
+http://www.wikidata.org/entity/Q224717,Point(125.1993 38.6935),Nampo Dam,,KP,,1986-01-01T00:00:00Z,Taedong River,causeway
+http://www.wikidata.org/entity/Q224717,Point(125.1993 38.6935),Nampo Dam,,KP,,1986-01-01T00:00:00Z,Taedong River,dam
+http://www.wikidata.org/entity/Q806225,Point(48.848687 32.053723),Band-e Kaisar,,IR,,,Karun River,weir
+http://www.wikidata.org/entity/Q806225,Point(48.848687 32.053723),Band-e Kaisar,,IR,,,Karun River,ancient Roman dam
+http://www.wikidata.org/entity/Q172822,Point(-114.737777777 36.015833333),,Hoover Dam,US,376.0,1931-01-01T00:00:00Z,,arch-gravity dam
+http://www.wikidata.org/entity/Q172822,Point(-114.737777777 36.015833333),,Hoover Dam,US,376.0,1931-01-01T00:00:00Z,,embankment dam
+http://www.wikidata.org/entity/Q172822,Point(-114.737777777 36.015833333),,Hoover Dam,US,221.4,1931-01-01T00:00:00Z,,arch-gravity dam
+http://www.wikidata.org/entity/Q172822,Point(-114.737777777 36.015833333),,Hoover Dam,US,221.4,1931-01-01T00:00:00Z,,embankment dam
+http://www.wikidata.org/entity/Q12514,Point(111.00367 30.82386),Three Gorges Dam,,CN,181.0,1994-01-01T00:00:00Z,,gravity dam
+http://www.wikidata.org/entity/Q999999901,Point(4.5 51.9),Synthetic Test Levee,,NL,,,,levee
+http://www.wikidata.org/entity/Q999999902,Point(5.5 52.1),Synthetic Test Weir,,NL,,,,weir
+http://www.wikidata.org/entity/Q999999903,Point(6.5 50.1),Synthetic Test Splash Dam,,DE,,,,splash dam
+http://www.wikidata.org/entity/Q999999904,Point(181.0 50.1),Synthetic Bad Point Dam,,DE,,,,dam

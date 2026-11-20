@@ -1,29 +1,76 @@
-# Space-Domain Awareness Collision Predictor
+<div align="center">
 
-**Satellite conjunction analysis engine**: SGP4 orbital propagation, full-catalog screening, four collision-probability methods validated against NASA CARA, CCSDS CDM exchange, maneuver planning, pass prediction, breakup and re-entry modelling, an LLM agent front door, and an interactive 3D globe.
+# Vantage
 
-**[Open the live demo](https://jdardash.github.io/space-collision-predictor/)**: the WorldView globe running entirely in the browser, propagating a real catalog with client-side SGP4. No backend, no sign-in, nothing to cold-start.
+**Open-source space-domain awareness on a live 3D globe.**
 
-The demo ships a fixed TLE snapshot, so treat the positions as illustrative rather than operational: SGP4 accuracy degrades within a couple of weeks of epoch. For current elements, run the full application with `make docker`, which fetches live CelesTrak data and adds the position feed, conjunction analysis, and the aircraft, seismic, and traffic layers.
+Every tracked object in orbit, collision probability checked against NASA's own reference cases, and the world underneath it:
+aircraft, ships, earthquakes, fires, storms, front lines and conflict history since 1989, 175,000 pieces of infrastructure, 193,000 public cameras, the aurora, the night sky overhead, and every mountain with its summit forecast. Click anything and it tells you what it is.
 
-[![CI](https://github.com/jdardash/space-collision-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/jdardash/space-collision-predictor/actions)
+**[Open the live demo](https://jdardash.github.io/vantage/)** &nbsp;|&nbsp; [Quick start](#quick-start) &nbsp;|&nbsp; [Gallery](#gallery) &nbsp;|&nbsp; [How it compares](#how-it-compares) &nbsp;|&nbsp; [API](#api-reference)
+
+[![CI](https://github.com/jdardash/vantage/actions/workflows/ci.yml/badge.svg)](https://github.com/jdardash/vantage/actions)
+[![codecov](https://codecov.io/gh/jdardash/vantage/branch/main/graph/badge.svg)](https://codecov.io/gh/jdardash/vantage)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue?logo=python&logoColor=white)](https://python.org)
-[![SGP4](https://img.shields.io/badge/SGP4-WGS72-orange)](https://pypi.org/project/sgp4/)
+[![NASA CARA](https://img.shields.io/badge/NASA_CARA-53%2F53_CDMs-0b3d91)](#validation--accuracy)
+[![CesiumJS](https://img.shields.io/badge/globe-CesiumJS-6caddf)](https://cesium.com/platform/cesiumjs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
----
+![Vantage globe](docs/gallery/hero.jpg)
 
-![3D Conjunction Visualization](docs/screenshot.png)
+</div>
 
-### WorldView: live catalog globe
+The live demo is the globe running entirely in the browser on a fixed element snapshot, with client-side SGP4 and no backend. Positions in it are illustrative, since SGP4 accuracy degrades within a couple of weeks of epoch. Run the full application (`python -m sda.api`, or `make docker`) for current elements and everything that needs a server: conjunction screening, collision probability, the camera catalog, live feeds, space weather and summit conditions.
 
-1,406 objects propagated client-side, with per-entity tracking, selectable data layers, and time-warp playback.
+## Gallery
 
-![WorldView global view with tracked entity](docs/showcase-worldview.png)
-
-| Entity tracking | NVG view mode |
+| | |
 | --- | --- |
-| ![Tracking a satellite](docs/showcase-tracking.png) | ![NVG post-processing filter](docs/showcase-nvg.png) |
+| ![Object dossier](docs/gallery/dossier.jpg) | ![Sky view](docs/gallery/sky.jpg) |
+| **Object dossier.** The ISS picked from the stations filter, with owner, launch, size and mass from the public SATCAT. | **Sky view.** Standing in Cairo looking up: 2,851 stars, constellation lines, the planets and every satellite above the horizon. |
+| ![Aurora](docs/gallery/aurora.jpg) | ![Public cameras](docs/gallery/cameras.jpg) |
+| **Aurora.** NOAA SWPC's OVATION oval over the Black Marble night lights. | **Public cameras.** 193,190 public cameras across 176 countries, clustered until you zoom in. |
+| ![NASA imagery](docs/gallery/nasa.jpg) | ![Summit conditions](docs/gallery/summit.jpg) |
+| **NASA imagery.** VIIRS true colour for any day since 2018, swiped against July. | **Summit conditions.** Mont Blanc on 3D terrain with a seven-day GO / MARGINAL / NO call. |
+| ![Map tools](docs/gallery/maptools.jpg) | ![Weather](docs/gallery/weather.jpg) |
+| **Map tools.** A JFK to Heathrow great circle, range rings, an area, a pin, the graticule and a coordinate card with MGRS and UTM. | **Weather.** RainViewer radar under an Open-Meteo 10 m wind field, with NHC and GDACS cyclones when any are active. |
+| ![World peaks](docs/gallery/peaks.jpg) | ![3D city](docs/gallery/kano-osm.png) |
+| **World peaks.** The Khumbu with every summit over 100 m of prominence; markers carry each peak's GO / MARGINAL / NO call for the day. | **3D city.** Kano from 465 m with no map key: 2,174 OpenStreetMap buildings extruded from their tags over Esri imagery. A free Cesium ion token swaps in Google's photorealistic mesh. |
+
+## How it compares
+
+Checked on 2026-11-19 against the public sites and the open-source projects surveyed in [reference/COMPARISON.md](reference/COMPARISON.md) (section 10 has the method and the evidence). Paid and closed products are compared from their own public material.
+
+| | Vantage | NASA Worldview / Eyes | CelesTrak SOCRATES | keeptrack.space | Paid SSA (LeoLabs, Slingshot, COMSPOC) |
+| --- | --- | --- | --- | --- | --- |
+| Full public catalog live in 3D | yes, worker SGP4, 33,000 objects | dozens of NASA missions | no globe | yes | yes |
+| Collision probability methods | Foster, Chan, Alfano, Monte Carlo, with usage checks | none | one | not in the public build | yes, on their own covariances |
+| Checked against NASA CARA reference cases | 53 of 53 CDMs, 11 of 11 Alfano cases, in CI | n/a | no | no | not published |
+| CCSDS CDM in and out (KVN and XML) | yes | no | download only | no | yes |
+| Survives the primary catalog going down | yes: SatNOGS DB and COMSPOC Spacebook fallbacks, six-digit ids | n/a | n/a | no | own sensors |
+| Dated satellite imagery and natural events | NASA GIBS with swipe compare, EONET | yes, the reference | no | no | no |
+| Public cameras on the map | 193,190 (167,883 playable) | no | no | no | no |
+| Aurora, space weather, sky view | OVATION oval, Kp and solar wind, stars and planets from any point | partial | no | partial | no |
+| Weather and map tools | radar, animated wind, cyclones; distance, area, rings, profile, line of sight, MGRS and UTM | weather imagery layers; distance and area measuring | no | no | no |
+| Mountains with summit forecasts | 12.2 million summits, a GO / MARGINAL / NO call per day | no | no | no | no |
+| Assistant with typed tools | local model by default, plus MCP | no | no | no | AIP-style, paid |
+| Price and source | free, MIT | free, closed app | free | free, AGPL | paid, closed |
+
+Against the OSINT world maps, checked the same day. ARGOS ATLAS is closed and freemium, so it is compared from its public feature list; the VIP layer it has (people linked to private jets and yachts) is left out of Vantage on purpose, as person tracking.
+
+| | Vantage | ARGOS ATLAS |
+| --- | --- | --- |
+| Price and source | free, MIT, 3D globe included | 2D map free, 3D globe paid, closed |
+| Public cameras | 193,190 (167,883 playable) | 200,000+ (18,838 live video) |
+| Military aircraft, emergency squawks, sanctions match, dead reckoning | yes, plus GPS interference hexes | yes |
+| Ships: AIS, dark ships, sanctions by IMO, strait monitors | yes, nine chokepoints, OFAC and UK lists | yes, OFAC |
+| Front lines | Ukraine drawn daily since 2022-04-03; 13 more theatres as towns held | 16 drawn |
+| Verified events and conflict history | GeoConfirmed; UCDP, 434,601 events since 1989 | GeoConfirmed; UCDP |
+| Country cards, outbreaks, cyber, outages, convergence | yes | yes |
+| Infrastructure | 174,861 sites and cables | about 93,000 sites and cables |
+| Satellites, collision probability, sky view, aurora, summits, NASA imagery | yes | not on its feature list |
+
+What Vantage cannot match is the data the paid products own: their radars and telescopes, orbit determination from raw observations, and operator ephemerides. A free tool downstream of public elements never has better states than its sources, and the [disclaimer](#disclaimer) applies.
 
 ---
 
@@ -53,7 +100,26 @@ Ingests **Two-Line Element sets (TLEs)** from CelesTrak, propagates orbits with 
 | **Security Posture** | Binds to 127.0.0.1 unless `SDA_HOST` is set, CORS allowlist, token-bucket rate limit on the feed proxies and agent, security headers |
 | **3D Visualization** | Plotly Earth + orbits + screening volumes; CesiumJS globe with worker-side SGP4 for the whole catalog, clock-driven time control, share links, covariance shells at TCA, a contacts roster and an installable static demo |
 | **Globe Styles and Tactical View** | Five GLSL post-process styles (CRT, night vision, FLIR white-hot / black-hot, noir, snow) with a CSS fallback, detection glow, chase / cockpit / orbit / tour camera modes, fading trails, a screen-space label arbiter, sensor field-of-regard cones with inside-cone highlighting |
-| **Live Data** | Async CelesTrak multi-group fetch, NOAA space weather, background refresh |
+| **Live Data** | Async CelesTrak OMM multi-group fetch, NOAA space weather, background refresh; when CelesTrak delivers nothing for two hours, SatNOGS DB and COMSPOC Spacebook take over, with per-source provenance on `/health` |
+| **Six-Digit Catalog** | OMM JSON ingestion through `sgp4.omm` (WGS72), alpha-5 TLE ids above 99,999, so the catalog keeps working past the five-digit NORAD limit |
+| **Object Dossier** | Owner, launch date and site, status, size and mass for any object, from the public SATCAT (Spacebook, Space-Track, GCAT), cached daily |
+| **Basemaps and NASA Imagery** | Eight basemaps (Blue Marble, day/night, night lights, high-res, hybrid, streets, topographic, dark) with no key; NASA GIBS imagery for any date with a swipe compare, and NASA EONET natural events on the globe |
+| **3D Cities** | A PHOTOREAL 3D basemap: Google Photorealistic 3D Tiles through a free Cesium ion token (`CESIUM_ION_TOKEN`), or without one OpenStreetMap buildings extruded from their height and level tags and coloured by kind, each clickable for its height; a height measure (HGT) in the map tools |
+| **Public Cameras** | 193,190 public cameras (167,883 playable) in SQLite with an R*Tree index, ethics filters on import, clustered on the globe |
+| **Sky View and Aurora** | Stand anywhere and look up: 2,851 stars, constellation lines, the Sun, Moon and planets, satellites overhead; the OVATION aurora oval as a smooth texture at 110 km |
+| **Summit Conditions** | Wind, temperature, chill, snow and cloud at summit height for any peak on Earth from Open-Meteo pressure levels, scored GO / MARG / NO per day, with weather alerts, avalanche and fire data where the source covers it |
+| **World Peaks** | Every summit on Earth with at least 100 m of prominence (11.9 million, from Kirmse and de Ferranti's 2023 GLO-30 list) plus 359,000 named-only peaks from GeoNames, served by viewport from SQLite in tens of milliseconds; click one for its summit forecast. Built once on the server with `python -m sda.peaks import` |
+| **Space Weather** | NOAA SWPC Kp, G/S/R scales and the 45-day Ap and F10.7 forecast in a globe panel; opt-in storm-aware decay (`/satellites/{id}/decay?forecast=true`) and a storm warning on conjunctions between low-perigee objects |
+| **Weather** | RainViewer radar for the past two hours with playback, a global 10 m wind field drawn as flowing particles (Open-Meteo), and NHC and GDACS tropical cyclones with forecast tracks and cones |
+| **Map Tools** | Cursor readout in decimal, DMS, MGRS and UTM with terrain height; go to any coordinate, grid reference or plus code; measure distance and area; pins, lines, polygons and range rings kept in the browser; elevation profile and line of sight; keyless terrain with exaggeration; 2D, 3D and Columbus view; lat/lon grid, day/night terminator, PNG export; GeoJSON, KML and GPX in and out; saved views |
+| **Click Anything** | Every object on the globe opens a card that says what it is: satellites (with the SATCAT dossier), aircraft and military aircraft, ships, earthquakes, storms, cameras, peaks, infrastructure, conflict events, chokepoints, orbit lines, sensor coverage, and the aurora oval with the chance under the cursor. The Sun and the Moon are drawn where they really are, and a click on either gives the distance, the Moon's phase and the point on Earth below it. A browser check on 2026-11-20 clicked 105 objects of 59 kinds with every layer on and none came back unnamed. In the sky view a click on any star, planet, the Moon, the Sun or a satellite overhead gives its brightness, distance, constellation and next rise and set |
+| **Armed Conflict** | The Ukraine line of contact and occupied areas from DeepStateMap, with every map since 2022-04-03; who holds each town in 13 more theatres from Wikipedia's maps; GeoConfirmed events verified against photo or video; 434,601 UCDP events since 1989 as density or single events; ACLED when an account is set |
+| **Aviation Intel** | Military aircraft and 7500 / 7600 / 7700 squawks from adsb.lol under one daily budget, an aircraft card with registration, type, operator and route, OFAC and UK sanctions matching by tail number and Mode S code, dead reckoning over the oceans, and GPS interference hexes |
+| **Maritime** | AIS vessels with OFAC and UK sanctions flags by IMO and MMSI, dark-ship estimates, and monitors on nine chokepoints: Gibraltar, Hormuz, Bab-el-Mandeb, Suez, Malacca, Panama, the Bosporus, Dover and the Taiwan Strait |
+| **Infrastructure** | 174,861 sites: 34,741 power plants and 195 nuclear, 49,357 airports, 3,803 ports, 77,689 dams, 5,304 data centres and 1,843 radiation stations, plus submarine cables and 1,929 landing points |
+| **Country Intel** | A country card on click: World Bank indicators, exchange hours, WHO outbreaks, botnet command-and-control counts, IODA internet outages, GDELT news grouped by place and an instability score, plus cells where three or more kinds of event meet within a day |
+| **Orbit Visuals** | Colour the catalog by type, owner, orbit, element age, size, launch decade or eclipse; a watchlist with next passes; constellation planes; debris clouds from fragmentation events; the catalog year by year since 1957; Earth's shadow; footprints; the brightest passes tonight |
+| **Search and Presentation** | One search box for coordinates, places, satellites (by name, NORAD id or nickname), aircraft, cameras and peaks; 3D aircraft, ships, the ISS and Hubble when zoomed in, with a ride-along camera; live infrared clouds; a hotspot tour; What's here at any point; a camera wall |
 | **WebSocket Streaming** | Real-time satellite positions (lat/lon/alt/velocity) |
 
 ---
@@ -61,8 +127,8 @@ Ingests **Two-Line Element sets (TLEs)** from CelesTrak, propagates orbits with 
 ## Quick Start
 
 ```bash
-git clone https://github.com/jdardash/space-collision-predictor.git
-cd space-collision-predictor
+git clone https://github.com/jdardash/vantage.git
+cd vantage
 python -m venv .venv && source .venv/bin/activate  # .venv\Scripts\activate on Windows
 pip install -e ".[dev]"
 python -m sda.api
@@ -200,7 +266,7 @@ graph TB
 The dashboard (`GET /`) and the globe (`GET /worldview`) are served as HTML outside the schema. The table below is generated by `python scripts/gen_api_table.py --write`; do not edit it by hand.
 
 <!-- api-table:start -->
-73 REST endpoints + 1 WebSocket, with auto-generated docs at **/docs** (Swagger UI) and **/redoc**.
+149 REST endpoints + 1 WebSocket, with auto-generated docs at **/docs** (Swagger UI) and **/redoc**.
 
 | Method | Endpoint | Description |
 | ------ | -------- | ----------- |
@@ -256,27 +322,103 @@ The dashboard (`GET /`) and the globe (`GET /worldview`) are served as HTML outs
 | `GET` | `/agent/health` | LLM provider chain status |
 | `GET` | `/agent/tools` | Typed tool catalogue offered to the model |
 | `GET` | `/api/ais` | AIS vessel positions in a bounding box (needs AISSTREAM_API_KEY) |
+| `GET` | `/api/aurora` | NOAA SWPC OVATION aurora probability map, cells at or above a threshold |
+| `GET` | `/api/aviation/aircraft/{hex_id}` | Aircraft card: registration, type, operator, route and LiveATC links |
+| `GET` | `/api/aviation/emergencies` | Aircraft squawking 7500, 7600 or 7700 (adsb.lol) |
+| `GET` | `/api/aviation/gps-interference` | GPS interference inferred from aircraft NIC and NACp per hex, last hour |
+| `GET` | `/api/aviation/military` | Military aircraft from adsb.lol /v2/mil, cached to fit the request budget |
+| `GET` | `/api/aviation/nearest-site` | Nearest mapped military site to a point (OpenStreetMap via Overpass) |
+| `GET` | `/api/aviation/status` | adsb.lol request budget and refresh intervals for the aviation overlay |
 | `GET` | `/api/bikeshare` | GBFS bikeshare stations and live availability |
+| `GET` | `/api/buildings` | OpenStreetMap building footprints and heights in a small box |
+| `GET` | `/api/cameras` | Public cameras inside a view (capped, evenly sampled) |
+| `GET` | `/api/cameras/density` | Camera counts per grid cell inside a view |
+| `GET` | `/api/cameras/nearest` | Cameras nearest a point, nearest first |
+| `GET` | `/api/cameras/random` | One random camera |
+| `GET` | `/api/cameras/search` | Cameras whose name or city contains the text |
+| `GET` | `/api/cameras/summary` | What the public camera catalog holds |
+| `GET` | `/api/cameras/{rid}` | One camera with its feed |
+| `GET` | `/api/cameras/{rid}/snapshot` | Current snapshot of a TxDOT camera (JPEG) |
 | `GET` | `/api/cctv` | Public traffic-camera locations and snapshot URLs |
 | `GET` | `/api/config` | Optional map-provider tokens for the WorldView frontend |
+| `GET` | `/api/conflict/acled` | Recent ACLED events (needs ACLED_EMAIL and ACLED_PASSWORD on the server) |
+| `GET` | `/api/conflict/acled/{event_id}` | One ACLED event |
+| `GET` | `/api/conflict/control/{theatre}` | Control of settlements in one theatre (Wikipedia detailed map) |
+| `GET` | `/api/conflict/events` | Events verified against photo or video (GeoConfirmed), newest first |
+| `GET` | `/api/conflict/events/{event_id}` | One verified event with its sources |
+| `GET` | `/api/conflict/frontline/ukraine` | Russia-Ukraine areas of control and line of contact (DeepStateMap) |
+| `GET` | `/api/conflict/frontline/ukraine/dates` | Days with a DeepStateMap update, oldest first |
+| `GET` | `/api/conflict/history/density` | UCDP events per grid cell over a year range |
+| `GET` | `/api/conflict/history/events` | The deadliest UCDP events inside a view |
+| `GET` | `/api/conflict/history/summary` | What the UCDP history store holds |
+| `GET` | `/api/conflict/history/years` | UCDP events and deaths per year |
+| `GET` | `/api/conflict/history/{event_id}` | One UCDP event |
+| `GET` | `/api/conflict/summary` | Conflict layer sources and their state |
 | `POST` | `/api/conjunction-globe-data` | Conjunction events formatted for CesiumJS globe rendering |
 | `POST` | `/api/conjunction-pc-history` | Pc evolution over lead times before TCA |
 | `GET` | `/api/earthquakes` | Recent seismic activity from USGS |
+| `GET` | `/api/eonet` | NASA EONET natural events, one point each (latest geometry) |
 | `GET` | `/api/fires` | NASA FIRMS active fire detections (needs FIRMS_MAP_KEY) |
 | `GET` | `/api/flights` | Live flight data from OpenSky Network |
-| `GET` | `/api/gdelt` | Geolocated news events from the GDELT GEO 2.1 API |
+| `GET` | `/api/gdelt` | Geolocated news events from the GDELT 2.0 event export, grouped by place |
 | `GET` | `/api/geocode` | Place search via OpenStreetMap Nominatim |
+| `GET` | `/api/geocode/reverse` | Place name for a point via OpenStreetMap Nominatim |
+| `GET` | `/api/infra/cables` | Submarine cables as GeoJSON (TeleGeography) |
+| `GET` | `/api/infra/cables/{cable_id}` | One cable: landing countries and how many other cables land in each |
+| `GET` | `/api/infra/item/{uid}` | One infrastructure item with its fields, links and source |
+| `GET` | `/api/infra/items` | Infrastructure inside a view, the limit shared across kinds |
+| `GET` | `/api/infra/search` | Infrastructure by name or code, highest ranked first |
+| `GET` | `/api/infra/summary` | What the infrastructure catalog holds |
+| `GET` | `/api/intel/borders` | Simplified country polygons for the choropleth |
+| `GET` | `/api/intel/convergence` | Cells where three or more event kinds meet within 24 hours |
+| `GET` | `/api/intel/countries` | Every country with its label point and box |
+| `GET` | `/api/intel/country-at` | The country under a point |
+| `GET` | `/api/intel/country/{code}` | The country card |
+| `GET` | `/api/intel/cyber` | Botnet C2 servers per country (abuse.ch Feodo Tracker) |
+| `GET` | `/api/intel/exchanges` | Which major stock exchanges are in session now |
+| `GET` | `/api/intel/instability` | This application's instability heuristic for every country |
+| `GET` | `/api/intel/outages` | IODA internet outage alerts per country, 24 h |
+| `GET` | `/api/intel/outbreaks` | WHO Disease Outbreak News at affected countries |
+| `GET` | `/api/intel/summary` | Country intel sources, attribution and formula |
 | `GET` | `/api/launches` | Upcoming orbital launches from Launch Library 2 |
+| `GET` | `/api/maritime/chokepoints` | Chokepoint monitors: polygons, vessels inside now, transits |
+| `GET` | `/api/maritime/chokepoints/{cp_id}` | Vessels inside one chokepoint monitor now |
+| `GET` | `/api/maritime/vessels` | Vessels in a box with sanctions flags, plus dark-ship estimates |
 | `GET` | `/api/military-flights` | Live military aircraft from crowdsourced ADS-B (adsb.lol) |
 | `GET` | `/api/military-sites` | Military installations in a bounding box from OpenStreetMap |
+| `GET` | `/api/orbitviz/attributes` | SATCAT attributes of every object on orbit, packed |
+| `GET` | `/api/orbitviz/debris` | Fragmentation events and their pieces still on orbit |
+| `GET` | `/api/orbitviz/history` | Objects in orbit by year, from SATCAT launch and decay dates |
+| `POST` | `/api/orbitviz/visible` | Brightest visible passes over an observer |
+| `GET` | `/api/peaks` | Peaks inside a view, most prominent first |
+| `GET` | `/api/peaks/density` | Peak counts per grid cell, with the highest peak in each |
+| `GET` | `/api/peaks/nearest` | Peaks nearest a point, nearest first |
+| `GET` | `/api/peaks/search` | Named peaks whose name starts with the text, most prominent first |
+| `GET` | `/api/peaks/summary` | What the worldwide peak catalog holds |
+| `GET` | `/api/peaks/{peak_id}` | One peak with its sources |
 | `GET` | `/api/radio` | Internet radio stations near a point (Radio Browser) |
+| `GET` | `/api/sanctions/aircraft` | Is an aircraft listed? By tail number, Mode S code or serial |
+| `GET` | `/api/sanctions/index` | Every match key of one kind |
+| `GET` | `/api/sanctions/summary` | What the cached sanctions lists hold |
+| `GET` | `/api/sanctions/vessel` | Is a vessel listed? By IMO number or MMSI |
+| `GET` | `/api/satcat/facets` | Satcat Facets |
+| `GET` | `/api/satcat/ids` | Satcat Ids |
+| `GET` | `/api/satcat/status` | Satcat Status |
+| `GET` | `/api/satcat/{norad_id}` | Satcat Card |
 | `GET` | `/api/satellite-orbits` | Orbit paths for all tracked satellites |
 | `GET` | `/api/satellite-positions` | All satellite positions as lat/lon/alt |
+| `GET` | `/api/search` | Universal search: coordinates, satellites, aircraft, cameras, peaks, places |
 | `GET` | `/api/space-weather` | NOAA SWPC planetary K index, solar wind and active alerts |
+| `GET` | `/api/space-weather/conjunction` | Geomagnetic storm warning for a conjunction's TCA and the two perigees |
+| `GET` | `/api/space-weather/summary` | NOAA SWPC Kp, G/S/R scales, observed F10.7 and the 45-day Ap and F10.7 forecast |
+| `GET` | `/api/summit/conditions` | Summit Conditions |
+| `POST` | `/api/summit/verdicts` | Summit Verdicts |
 | `GET` | `/api/tles` | Raw TLE catalog for client-side propagation |
 | `GET` | `/api/traffic` | Road geometry in a bounding box from OpenStreetMap Overpass |
 | `GET` | `/api/volcanoes` | Holocene volcanoes from the Smithsonian Global Volcanism Program |
 | `GET` | `/api/weather-alerts` | Active National Weather Service alerts (United States) |
+| `GET` | `/api/weather/cyclones` | Active tropical cyclones: NOAA NHC (with track and cone) and GDACS (all basins) |
+| `GET` | `/api/weather/wind` | Global 10 m wind u/v on a 5-degree grid for the current hour (Open-Meteo) |
 | `WS` | `/ws/positions` | WebSocket stream |
 <!-- api-table:end -->
 

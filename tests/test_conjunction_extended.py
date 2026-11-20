@@ -1,4 +1,4 @@
-"""Extended conjunction tests — edge cases and historical validation."""
+"""Extended conjunction tests: edge cases and historical validation."""
 
 from datetime import UTC, datetime
 
@@ -87,35 +87,45 @@ def test_historical_iridium_cosmos_like():
     Simulates an Iridium-33/Cosmos-2251-like geometry:
     two satellites in crossing orbits with high relative velocity.
     The system should detect a close approach within the threshold.
+
+    The pair used to be ISS and CSS from 2024-02-14, which never come closer
+    than 9,131 km in this window (1 s brute force), so the old
+    ``if len(events) > 0`` guard skipped every assertion. This pair, from the
+    synthetic catalog of scripts/bench_screening.py (also in
+    tests/test_screening_recall.py), crosses at 85.8 and 50.8 degrees
+    inclination and meets at 14.24 km/s, missing by 0.670 km at 01:27:41Z.
     """
     store = TLEStore()
-    # Use two real LEO satellites with different inclinations
-    # to create a crossing-orbit scenario
+    # Two LEO satellites with different inclinations: a crossing-orbit scenario
     store.load_from_text(
-        "ISS (ZARYA)\n"
-        "1 25544U 98067A   24045.51782528  .00012516  00000+0  22596-3 0  9997\n"
-        "2 25544  51.6412 210.9280 0004885 231.2372 247.0342 15.49584387440014\n"
-        "CSS (TIANHE)\n"
-        "1 48274U 21035A   24045.52083333  .00020000  00000+0  27000-3 0  9991\n"
-        "2 48274  41.4700 100.0000 0007000 280.0000  80.0000 15.60000000100001"
+        "SYNTH 70086\n"
+        "1 70086U 13067B   26081.25673732  .00013092  00000+0  24096-3 0  9998\n"
+        "2 70086  85.8281  83.1960 0003303  95.4652 265.6260 15.54770332    17\n"
+        "SYNTH 71200\n"
+        "1 71200U 25275A   26081.16296743  .00015089  00000+0  28686-3 0  9991\n"
+        "2 71200  50.8343 267.1080 0006186 218.8034 310.9980 15.54638451    19"
     )
 
-    # Wide threshold to ensure we catch something
+    # Wide threshold: every node crossing within 100 km is its own event
     events = find_conjunctions(
         store,
         hours=48.0,
         threshold_km=100.0,
-        start=datetime(2024, 2, 14, 0, 0, tzinfo=UTC),
+        start=datetime(2026, 1, 1, 0, 0, tzinfo=UTC),
         compute_probability=True,
     )
 
-    # These satellites should have at least one approach
-    # within 100 km over 48 hours (different orbital planes cross)
+    # The crossing planes give a head-on approach under 1 km and further
+    # passes of the same pair within 100 km over 48 hours
+    assert len(events) >= 2
+    assert any(
+        e.miss_distance_km < 1.0 and e.relative_velocity_km_s > 10.0 for e in events
+    )
     if len(events) > 0:
         # Validate event structure
         for e in events:
-            assert e.primary in (25544, 48274)
-            assert e.secondary in (25544, 48274)
+            assert e.primary in (70086, 71200)
+            assert e.secondary in (70086, 71200)
             assert e.primary != e.secondary
             assert e.miss_distance_km <= 100.0
             assert e.miss_distance_km >= 0.0

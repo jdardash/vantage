@@ -1,0 +1,73 @@
+{
+ "data": [
+  {
+   "id": 1,
+   "org_name": "Equinix, Inc.",
+   "name": "Equinix DC1-DC15,DC21-DC22 - Ashburn",
+   "website": "http://www.equinix.com/",
+   "clli": "ASBNVA",
+   "net_count": 529,
+   "ix_count": 9,
+   "carrier_count": 14,
+   "region_continent": "North America",
+   "updated": "2026-02-12T20:01:14Z",
+   "city": "Ashburn",
+   "country": "US",
+   "state": "VA",
+   "latitude": 39.016363,
+   "longitude": -77.459023
+  },
+  {
+   "id": 2,
+   "org_name": "Digital Realty",
+   "name": "Digital Realty SFO (200 Paul)",
+   "website": "https://www.digitalrealty.com",
+   "clli": "SNFCCA",
+   "net_count": 45,
+   "ix_count": 2,
+   "carrier_count": 2,
+   "region_continent": "North America",
+   "updated": "2025-09-26T22:42:02Z",
+   "city": "San Francisco",
+   "country": "US",
+   "state": "CA",
+   "latitude": 37.723407,
+   "longitude": -122.397923
+  },
+  {
+   "id": 18,
+   "org_name": "Nikhef",
+   "name": "NIKHEF Amsterdam",
+   "website": "http://www.nikhefhousing.nl",
+   "clli": "AMSTNL",
+   "net_count": 508,
+   "ix_count": 29,
+   "carrier_count": 44,
+   "region_continent": "Europe",
+   "updated": "2025-09-26T22:42:05Z",
+   "city": "Amsterdam",
+   "country": "NL",
+   "state": "NH",
+   "latitude": 52.356394,
+   "longitude": 4.950837
+  },
+  {
+   "id": 34,
+   "org_name": "Telehouse - Global Data Centers",
+   "name": "Telehouse - London (Docklands North)",
+   "website": "http://www.telehouse.net",
+   "clli": "LONDEN",
+   "net_count": 493,
+   "ix_count": 13,
+   "carrier_count": 19,
+   "region_continent": "Europe",
+   "updated": "2025-09-26T22:42:07Z",
+   "city": "London",
+   "country": "GB",
+   "state": "",
+   "latitude": null,
+   "longitude": null
+  }
+ ],
+ "meta": {}
+}

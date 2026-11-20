@@ -76,7 +76,7 @@ ENV_KEYS: tuple[tuple[str, bool], ...] = (
 )
 
 NETWORK_TARGETS: tuple[tuple[str, str], ...] = (
-    ("CelesTrak", "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle"),
+    ("CelesTrak", "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json"),
     ("OpenSky", "https://opensky-network.org/api/states/all"),
     ("USGS", "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_day.geojson"),
     ("Space-Track", "https://www.space-track.org"),
@@ -403,7 +403,7 @@ def format_table(report: DoctorReport, width: int = 58) -> str:
         )
 
     out = [
-        "space-collision-predictor doctor",
+        "vantage doctor",
         border,
         line("SECTION", "CHECK", "STATUS", "DETAIL"),
         border,
@@ -424,7 +424,7 @@ def format_table(report: DoctorReport, width: int = 58) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m sda.doctor",
-        description="Diagnose the space-collision-predictor install and configuration.",
+        description="Diagnose the Vantage install and configuration.",
     )
     parser.add_argument(
         "--network",

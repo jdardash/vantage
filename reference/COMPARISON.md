@@ -484,3 +484,406 @@ an error on every refresh) and is gone from the globe's catalog menu. What is
 open: an OMM path through the store, the worker, `rv2tle`, CDM output and the
 alpha-5 search. It changes the rule that all ingestion goes through
 `TLEStore.load_from_text`, so it waits for a decision.
+
+## 10. Against NASA, government and paid SDA products (2026-11-19)
+
+The question this time came from the owner: compare with NASA and keep working
+until the application is better than the best sites, government and Palantir
+included. Section 9 compared open-source maps; this one compares products.
+
+Method. Twenty-one products were read from their public pages and, where they
+answer without an account, probed live (`reference/notes/gap-nasa-gov-palantir.md`,
+section 1, with every source). Paid and closed products (LeoLabs, Slingshot,
+COMSPOC's paid tier, STK, Palantir) are judged only from their own published
+material; Palantir has no public SDA product to open, so nothing about it here
+was run. The note ranked twelve gaps by harm avoided for an operator first, and
+they were worked in that order alongside the map items asked for in the same
+session.
+
+### 10.1 The twelve gaps, item by item
+
+| # | Gap | Status | Where |
+| --- | --- | --- | --- |
+| 1 | A second keyless catalog source, six-digit objects | done: OMM reader with alpha-5 ids; SatNOGS DB and COMSPOC Spacebook asked in turn when CelesTrak delivers nothing for two hours; `/health` names the source of every held set | `omm.py`, `tle_store.py`, `api.py` |
+| 2 | Object-specific covariance for screening Pc | open | |
+| 3 | Object dossier and per-object hard-body radius | dossier done (owner, launch, type, RCS, mass and span from Spacebook SATCAT and GCAT, with COMSPOC's 5 kg, 10 m no-data placeholder never shown as a size); HBR into Pc open, the dossier is metadata only and never feeds Pc or risk | `satcat.py`, `routes/satcat.py`, `static/js/dossier.js` |
+| 4 | Operational screening volumes scored against the TraCSS answer key | open; the coarse-screen recall work in section 10.4 is the first half | |
+| 5 | Operator ephemeris screening | open | |
+| 6 | Storm-aware drag and prediction confidence | done: SWPC 45-day Ap and F10.7 integrated from the element epoch, storm term an upper bound, storm check on low-perigee conjunctions; passed the safety reviewer on its third round | `decay.py`, `spaceweather.py`, `routes/space.py` |
+| 7 | Fragmentation detection with a measured Gabbard diagram | open (the breakup model and its Gabbard preview predate this pass) | |
+| 8 | Reentry board on the globe | open on the globe; `/reentries` reads Space-Track TIP when credentials are set | `routes/ops.py` |
+| 9 | Behaviour baselines and alerts | open | |
+| 10 | Investigation timeline and case file | open | |
+| 11 | Dated NASA imagery and natural events with swipe compare | done: GIBS MODIS Terra, Aqua, VIIRS NOAA-20 true colour and the Day/Night Band for any day on the clock, two-date swipe, EONET events | `static/js/nasaimagery.js`, `routes/eonet.py` |
+| 12 | The rest of CARA (3D Pc, Nc, SDMC, Elrod) | open | |
+
+### 10.2 Map items added in the same pass
+
+| Item | What it is | Where |
+| --- | --- | --- |
+| Weather | RainViewer radar (13 frames), an Open-Meteo 10 m wind field animated as particles (2,232 points in four paced passes, at most twice a day), NHC and GDACS cyclones with track and cone | `routes/weather.py`, `static/js/weather.js` |
+| Map tools | distance, area, pins, range rings, elevation profile and line of sight on keyless Esri terrain, MGRS, UTM and plus codes, GeoJSON, KML and GPX in and out, bookmarks, graticule, terminator with twilight bands, reverse geocoding | `static/js/maptools.js`, `routes/worldview.py` |
+| Aurora and space weather | OVATION oval, Kp, G/S/R scales and the 45-day outlook | `static/js/aurora.js`, `static/js/spaceweather.js` |
+| Sky view | 2,851 stars, constellation lines, planets and every satellite above the horizon from any point | `static/js/skyview.js` |
+| Public cameras | 193,190 cameras in 176 countries, private-device sources excluded at import | `cameras.py`, `static/js/cameras.js` |
+| World peaks with conditions | 12,226,094 summits (11,866,713 with prominence), summit forecast scored GO / MARG / NO on click | `peaks.py`, `summit.py`, `static/js/peaks.js` |
+
+### 10.3 Evidence
+
+Run on 2026-11-19 against the tree that was committed (the screening recall work
+of section 10.4 held back), in a clean worktree, except the live rows, which come
+from the launcher's server on port 8010.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Test suite | `pytest tests/ -q` | 2424 passed, 1 skipped, 29 xfailed in 1,176 s (machine under memory pressure) |
+| Lint and types | `ruff check src/ tests/`, `mypy src/sda` | both clean (58 source files) |
+| CARA reference harness | `python -m sda.cara` | 53/53 Foster cases inside CARA's tolerance bands, 11/11 Alfano literals matched |
+| Cross-method Pc validation | `python -m sda.validation` | all checks passed |
+| API surface | `python scripts/gen_api_table.py --write` | 100 REST operations + 1 WebSocket, up from 73 in section 9 |
+| Live catalog | `GET /health` | 32,887 objects; CelesTrak had delivered nothing for two hours, so 32,119 element sets came from Spacebook and 757 from SatNOGS DB, which is gap 1 doing its job |
+| Live peaks | `GET /api/peaks/summary` | 12,226,094 summits, 980,452 named, 243 countries |
+| Live cameras | `GET /api/cameras/summary` | 193,190 cameras, 167,883 playable in the browser |
+
+### 10.4 Verdict
+
+Against free public sites the claim holds. No free web application found
+computes Pc four ways with coded usage checks and reproduces NASA CARA's own
+cases (CARA's own toolkit does the math, as a library rather than a site),
+and none puts that beside live weather, map tools, every summit on Earth with a forecast, the
+sky from any point, public cameras and dated NASA imagery on one globe.
+Worldview still carries more imagery: over a thousand GIBS layers against the
+four true-colour and night products used here, which suits a conjunction tool
+but is a real difference.
+
+Against government and paid products it does not hold, and code alone will not
+make it hold. Space-Track and TraCSS hold the full catalog with analyst objects,
+covariance for each object and operator ephemerides; LeoLabs, Slingshot and
+COMSPOC run their own sensors. This application estimates position error from
+the age of a TLE. The three gaps that matter most to an operator, object
+covariance (2), screening volumes scored against TraCSS (4) and operator
+ephemeris screening (5), are all data gaps first. Palantir has no public SDA
+product; its published strength is fusing many sources into a case file, which
+is gaps 9 and 10 here, and nothing about it was run.
+
+Gap 4's first half is in (2026-11-20): a rewrite of the coarse screen so that no
+close approach can fall between two samples. An interval is kept when the two
+objects' straight chords come within the threshold plus the linear-interpolation
+error bound, so the margin follows the physics instead of a fixed multiple. On
+2,000 objects over 6 h it finds 282 of the 282 approaches a dense 1 s reference
+finds (the old screen found 67), and the full pipeline went from 84.5 s to 2.2 s.
+The safety reviewer returned PASS on the tenth round. The ninth round's REVISE was a
+0.29 km approach lost to a last-bit timing difference between two paths.
+
+Next, in order: gap 4's screening volumes, then
+gap 2 through CDM covariances already ingested (`cdm.py`), then gap 8's reentry
+board on the globe, which needs nothing new from upstream.
+
+## 11. Against ARGOS ATLAS and the other OSINT world maps (2026-11-19)
+
+ARGOS ATLAS (argosatlas.com) is the camera-heavy world map the owner asked to be
+matched. It is closed and freemium, with no public repository, so it is compared
+from its public feature list (research log, 2026-11-19). The six build tracks
+that came out of it (aviation, maritime and sanctions, conflict, country intel,
+infrastructure, cameras) all landed in this branch, each behind its own tests.
+
+| Track | ARGOS ATLAS | Vantage |
+| --- | --- | --- |
+| Cameras | 200,000+ public cameras, 18,838 live video | 193,190, of which 167,883 play in the page |
+| Aviation | ADS-B with a military flag, 7500/7600/7700, OFAC aircraft match, dead reckoning over ocean | adsb.lol `/v2/mil` and squawks under one daily request budget, OFAC and UK lists by tail and Mode S, dead reckoning, GPS interference hexes, a route on the aircraft card |
+| Maritime | AIS, dark-ship flags, OFAC vessels by IMO, strait monitors | AIS through AISStream (free key), dark-ship estimates, OFAC and UK lists by IMO and MMSI, nine chokepoint monitors |
+| Conflict | 16 front lines, GeoConfirmed events, UCDP history | Ukraine drawn from DeepStateMap with all 1,813 maps since 2022-04-03, 13 more theatres as towns held (Wikipedia maps), GeoConfirmed (2,451 events in 90 days), UCDP GED 26.1 plus the Candidate set (434,601 events, 1989 to 2026), ACLED when keyed |
+| Country intel | GDELT risk zones, World Bank card, instability index, WHO outbreaks, cyber C2, outages, convergence | the same set, GDELT taken from the 2.0 event export because the GEO API now answers 404 |
+| Infrastructure | 34,936 plants, 47,927 airports, 1,081 ports, 4,072 data centres, 5,356 dams, cables | 34,741 plants and 195 nuclear, 49,357 airports, 3,803 ports, 5,304 data centres, 77,689 dams, 1,843 radiation stations, cables with 1,929 landing points |
+| VIP jets and yachts | yes | left out on purpose: it tracks people |
+| 3D globe | paid tier | free |
+
+Where ARGOS ATLAS is still ahead: drawn front lines in fifteen more theatres (ours
+are points there) and the count of cameras with live video. Where nothing on its
+list reaches: the whole orbital side (catalog, collision probability checked
+against NASA CARA, sky view, aurora), summits and NASA imagery.
+
+Click-to-identify was checked in a real browser on the same day: every layer was
+switched on, each kind of object the page draws was found by walking Cesium's
+primitives and entities, and one of each was clicked through the page's own
+handler and again with the mouse. Two gaps came out of it and were fixed: the
+aurora oval answered nothing (it now gives the chance under the cursor, and the
+page looks beneath it so an aircraft under the oval still opens its own card),
+and the sky view named only what sat under the crosshair (a click on any star,
+planet, the Moon, the Sun or a satellite overhead now opens a card). A third, the
+conflict layer's checkbox passing an undefined name, left the whole layer dead
+until fixed; a test now holds every toggle to the argument it is given.
+
+A second pass on 2026-11-20 switched on all 19 layers and walked ten places
+(the whole globe, Ukraine, New York from 60 km, the Alps, Rotterdam, Paris,
+Singapore, Everest, the Middle East, Tokyo). It found 59 kinds of object and
+clicked 105 of them; none answered "Unknown". Getting there took five fixes:
+
+- The 150 orbit lines, the sensor spokes, the conjunction markers and
+  uncertainty shells, and the road-traffic dots had no name, so a click said
+  "Tracking: Unknown entity". They are named now, a click on an orbit line
+  selects its satellite, and a test reads every `entities.add` in the page and
+  fails on one without a name.
+- With every layer on, cameras, peaks, infrastructure and ships never drew.
+  `/api/satellite-orbits` ignored its `limit` and propagated the whole catalog
+  for over two minutes, and `/api/flights` waited 72 s on OpenSky with no
+  cache; a browser opens six connections to one host, so those two held the
+  rest back. Orbits now answer in 0.2 s, and flights in 1.7 s, then 0.05 s
+  from a 10 s cache that keeps serving the last good copy for five minutes.
+  The camera layer also threw away its own answer when a repeat refresh
+  arrived while it was loading.
+- The six aircraft models answered 404: the static route had no `.glb` type.
+- The globe hid the Sun and the Moon. Both are now drawn where they are at the
+  simulation time, and a click on either gives the distance, the Moon's phase
+  and the point on Earth it stands over (78% lit and 381,766 km on the day,
+  matching the sky view's own card).
+- In the sky view a satellite a degree away could take a click aimed squarely
+  at a star (Betelgeuse came back as GEESAT 6-03). The tie-break between kinds
+  is now 5% of the click reach per step instead of half a degree.
+
+Ships were not clicked live: the vessel layer needs an AISStream key, and none
+is set on this machine. The vessel and chokepoint cards are covered by
+`tests/test_globe_maritime.py`.
+
+## 12. Are we better than all of them yet? (2026-11-20)
+
+The owner asked it plainly. Not yet.
+
+On depth the application is ahead of every open project and free site found: none
+of them computes Pc four ways with coded usage checks and reproduces NASA CARA's
+own cases, and none puts that on one globe with live aircraft and ships, conflict
+and country intelligence, 193,190 public cameras, every summit with a forecast,
+the sky from any point and dated NASA imagery. On a short list of named features
+it is still behind named rivals (12.3), five of those rivals pushed new work
+today (12.1), and against government and paid products it is behind on data that
+no amount of code creates (12.4).
+
+### 12.1 The rivals kept moving
+
+Checked through the GitHub API on 2026-11-20 against the commit each clone in
+`reference/` was read at. Only commit titles were read, so a row says what a rival
+claims to have added, not what its code does. Reading that code is task 0 of the
+plan in 12.6.
+
+| Repo | Last push | Commits since our read | What the new commits add |
+| --- | --- | --- | --- |
+| gods-eye-view | 2026-11-20 | 4,553 | in the newest 250, mostly upkeep; a host can name the layers a bare address opens with |
+| worldmonitor | 2026-11-20 | 4,373 | "Orbital Watch": watched ground sites, the satellites covering each, imagery before and after an event date, reservoir water extent; alerts when airline departures collapse in six countries |
+| keeptrack.space | 2026-11-20 | 1,078 | a Most Tracked menu, ISS and Tiangong modules merged into their host, visiting vehicles hidden while docked |
+| satvis | 2026-11-17 | 663 | an iOS app, ground stations added from a menu on the globe, a 24-hour sun-synchronous crossing chart |
+| Shadowbroker | 2026-11-20 | 301 | an OSM basemap behind a tile proxy |
+| osiris | 2026-11-20 | 39 | at least 2,148 more keyless road cameras (Italy 967, Idaho 416, France 405, Delaware 360, plus Virginia, Maryland, South Carolina and Bizkaia), keyless wind and rain, "AI Analyze" on camera frames, Shodan port scans |
+| satlas | 2026-09-10 | | quiet |
+| satguard | 2026-03-23 | | quiet |
+| worldview (shawn14) | 2026-03-03 | | quiet |
+| ThingsInSpace | 2024-01-09 | | renamed jeyoder/StuffInSpace; dormant |
+| spacetech-ssa | archived | | read-only on GitHub |
+| OrbitVoyage | gone | | the repository answers 404; the gap it set (12.3) stays on the list |
+
+worldmonitor's Orbital Watch is the first rival move onto this application's
+ground: which satellites see a place, and what they saw. It is AGPL, so it is an
+idea source only.
+
+### 12.2 Closed since section 9
+
+| Gap named in 9.3 | Rival | Closed by |
+| --- | --- | --- |
+| Weather layers | gods-eye-view | radar, animated wind, cyclone tracks and cones (`static/js/weather.js`) |
+| 3D aircraft models | gods-eye-view | six CC BY 4.0 models (`static/models/`, `static/js/models.js`) |
+| Polar plot, watchlist | keeptrack.space | `static/js/passpanel.js`, `static/js/orbitviz.js` |
+| Cloud and star layers, country mode | satlas | `static/js/clouds.js`, `static/js/skyview.js`, the country card (`intel.py`) |
+| Country labels, geopolitical alert zones | worldview (shawn14) | the country card, GDELT zones and the instability score (`intel.py`) |
+| Idle auto-hide panels | OrbitVoyage | `static/js/presentation.js` |
+| Phone control sheet | satlas | `static/js/presentation.js`: at 700 px wide or less the controls become a bottom sheet with a handle; not yet checked on a phone-sized browser (task 8) |
+| Objects cataloged since July 2026 (9.6) | keeptrack, Shadowbroker, satvis | the OMM reader (`omm.py`, section 10.1 row 1) |
+| Realtime voice | gods-eye-view | partly: browser speech in and out on the agent panel; no streaming voice model, which would need a paid API |
+| More OSINT layers | osiris, worldmonitor, Shadowbroker | partly: 19 globe layers and the six ARGOS tracks of section 11; worldmonitor still lists more |
+
+### 12.3 Still open, per rival
+
+| Rival | Open gap | Plan task (12.6) |
+| --- | --- | --- |
+| OrbitVoyage | conjunction events pushed to the page as they are found | 1 |
+| satguard | conjunction heatmap | 2 |
+| spacetech-ssa | CZML export | 3 |
+| keeptrack.space | saved scenarios | 4 |
+| satguard, keeptrack.space | Clohessy-Wiltshire tradespace, proximity operations (RPO) | 5 |
+| ARGOS ATLAS | drawn front lines in the 13 theatres shown as towns | 6 |
+| gods-eye-view | camera viewshed | 7 |
+| satvis | the PWA on the live app (ours installs only from the static build) | 8 |
+| satvis | pass notifications | 9 |
+| satvis | a sky view that follows the phone | 10 |
+| osiris, ARGOS ATLAS | more keyless road cameras; a count of live-video feeds to set beside ARGOS's 18,838 | 11 |
+| worldmonitor | which satellites image a place, and when | 12 |
+| gods-eye-view | Anime style | 13 |
+| keeptrack.space | renderer scale | measured in task 14 before it is claimed either way |
+| keeptrack.space | stereographic map | dropped: 2D mode with ground tracks and the polar plot already show what it shows |
+| keeptrack.space | Most Tracked | not planned: it ranks keeptrack's own usage, which no one else has |
+| spacetech-ssa | ML residual orbit model | not planned: training it needs precise ephemerides as truth, a data gap (12.4) |
+
+Left out on purpose, and staying out unless the owner overrules: ARGOS ATLAS's
+VIP jets and yachts (they track people), osiris's Shodan port scans (they probe
+hosts we do not own), and osiris's AI identification of vehicles on street
+cameras (following a vehicle across cameras is following its driver).
+
+### 12.4 What code cannot close
+
+Section 10.4 stands. Space-Track and TraCSS hold covariance for each object,
+analyst objects and operator ephemerides; LeoLabs, Slingshot and COMSPOC run
+their own sensors. This application estimates position error from the age of a
+TLE. Until one of those sources opens, "better than government and paid
+products" cannot be claimed for conjunction assessment, only for what a free,
+open, local tool can show.
+
+### 12.5 How this was checked
+
+| Check | Result |
+| --- | --- |
+| Test suite, 2026-11-20 | 2,925 passed, 1 skipped, 29 xfailed in 127 s |
+| Browser click audit, 2026-11-20 | 19 layers on, ten places, 59 kinds of object, 105 clicks, none unnamed (section 11) |
+| Rival activity | GitHub API: `pushed_at`, archive flag, and the compare count from each clone's read commit to the default branch |
+| Rival features | commit titles only; no code read this time |
+
+No independent reviewer was run on this verdict. Saying "not yet" does not need
+one; claiming "ahead of all" will, as section 9 did.
+
+### 12.6 The plan
+
+The working plan, with interfaces and tests for each task, is kept on this
+machine at `docs/superpowers/plans/2026-11-20-close-the-gaps.md` (`docs/superpowers/`
+is ignored by this repository). In order:
+
+0. Rescan the six active rivals: pull the clones, read the code behind each row of
+   12.1, amend 12.3 with what is really there.
+1. Live conjunctions: one catalog-wide screen per catalog refresh, pushed over a
+   new `/ws/conjunctions` socket with new, changed and cleared events.
+2. Conjunction heatmap on the globe, weighted by Pc, with a card under the cursor.
+3. CZML export of tracks and conjunctions for Cesium and STK users.
+4. Saved scenarios: the share link plus every module's settings, named, exported
+   and imported as a file.
+5. Relative motion: RIC tracks for the open conjunction, a Clohessy-Wiltshire
+   tradespace of avoidance burns, and a neighbours search for any object. Safety
+   reviewer before merge.
+6. Estimated front lines in the 13 theatres, drawn from towns held and labelled
+   as estimates.
+7. Camera viewshed: a pose per camera and the ground it can see, clipped by terrain.
+8. Phone: the PWA served by the live app, and the existing control sheet checked
+   at phone size, with what that check finds fixed.
+9. Pass notifications for watched satellites.
+10. A sky view that follows the phone's compass and tilt.
+11. More keyless road cameras, and a live-video count.
+12. Site watch: which imaging satellites pass over a place and whether it falls in
+    their swath.
+13. A cel-shaded style.
+14. Verification: the browser click audit moved into `scripts/`, a phone-sized
+    run, the full suite, the CARA harness, and this section rewritten with the
+    results.
+
+## 13. Against Google Earth and Google Maps (2026-11-20)
+
+The owner set the bar on 2026-11-20 with a Google Earth link: Kano, Nigeria, seen
+from 465 m at a 35 degree tilt, a photorealistic 3D city. The ask was to do all of
+what Google Earth and Google Maps do, at that quality, for no pay, and to build
+on it afterwards. This section is the parity list; the plan that closes it is
+`docs/superpowers/plans/2026-11-20-google-parity.md` (local), and it runs before
+the rival plan of 12.6.
+
+Does the application have all of it today? No. It has the globe, terrain, sub-metre
+imagery, search, measuring, KML and the rest of the drawing kit; it lacks the 3D
+city mesh in the owner's link, street-level imagery, directions, historical
+high-resolution imagery and most of Google Maps' place features.
+
+### 13.1 The quality in the link
+
+Google Earth's 3D cities are Google Photorealistic 3D Tiles. The page already
+loads them when `GOOGLE_MAPS_API_KEY` is set (`worldview.html` `checkConfig`), but
+a Google key needs a billing account, and Google's free allowance (1,000 root
+tile requests a month) has no hard cap. The same tiles reach Cesium through a
+Cesium ion Community account: free, no card, meant for personal non-commercial
+use, 1,000 scene loads of the Google tiles a month, limits Cesium describes as
+soft. That is the no-pay route to the quality in the link, and it needs one thing
+only the owner can do: sign up at cesium.com and set `CESIUM_ION_TOKEN`. Without
+it, the keyless fallback is OpenStreetMap buildings extruded from their mapped
+heights, which reads as a model of the city, not a photograph of it.
+
+### 13.2 Google Earth, feature by feature
+
+| Google Earth | Vantage now | Free way to close it | Task |
+| --- | --- | --- | --- |
+| Photorealistic 3D cities | only with a paid-tier Google key | Google tiles through a free Cesium ion token; OSM buildings keyless | G1 |
+| Satellite imagery | Esri World Imagery, NASA Blue Marble and Black Marble, keyless | | have |
+| Terrain | Esri elevation, keyless (`maptools.js`) | | have |
+| Search and fly to | Nominatim through the omnibox | | have |
+| Roads, borders and place labels over imagery | none over the imagery basemaps | Esri reference layers, keyless | G2 |
+| Historical imagery | NASA GIBS by day at 250 m to 1 km | Esri World Imagery Wayback, about 200 dated versions since 2014, keyless | G3 |
+| Timelapse | none | NASA GIBS Harmonized Landsat Sentinel-2 by year, keyless | G3 |
+| Detect change (experimental) | swipe between two NASA dates | the same swipe on Wayback, plus a pixel-difference overlay | G3 |
+| Elevation contours, slope | none | Cesium globe materials on the keyless terrain | G4 |
+| Street View | none | Panoramax (keyless) and Mapillary (free token, no card) | G5 |
+| Measure distance and area | yes, plus elevation profile and line of sight | building height on 3D tiles | G1 |
+| Projects, placemarks, KML | drawings, pins, bookmarks, KML, GeoJSON and GPX in and out | rich placemark text and a photo | G9 |
+| Voyager stories, present mode | tours and presentation mode | | have |
+| I'm Feeling Lucky | none | a random named place from the peak and Wikipedia sets | G8 |
+| Places, photos, knowledge cards | "what's here" card: address, elevation, weather, cameras, peaks, satellites overhead | Wikipedia geosearch and Wikimedia Commons, keyless | G8 |
+| Data layers: footprints, hydrants, storm drains, traffic lights | power, airports, ports, dams, data centres, cables | OpenStreetMap through Overpass for the view, keyless | G10 |
+| Animated clouds, gridlines | yes | | have |
+| Flight simulator (web since 2026) | none | a camera flight model with a HUD, no service needed | G11 |
+| Sky, Moon and Mars (Earth Pro) | sky view; no Moon or Mars globe | NASA Moon Trek and Mars Trek tiles, keyless | G12 |
+| Gemini in Earth | assistant with typed tools on a local model | | have |
+| AI image generation (experimental) | none | not planned: invented pictures of real places |  |
+| Land parcels | none | not planned: no free global source |  |
+
+### 13.3 Google Maps, feature by feature
+
+| Google Maps | Vantage now | Free way to close it | Task |
+| --- | --- | --- | --- |
+| Directions: drive, walk, cycle | none | OSRM and Valhalla public servers, keyless, light use | G6 |
+| Directions: transit | none | Transitous (MOTIS), keyless | G6 |
+| Explore nearby: food, fuel, hospitals, hotels | none | Overpass by category for the view | G7 |
+| Place card: hours, phone, website, access | address only | OpenStreetMap tags plus Wikidata | G7 |
+| Reviews and popular times | none | not planned: no free source exists |  |
+| Live traffic | an animation on major roads, not measured congestion | TomTom flow tiles with a free key (no card) | G13 |
+| Transit lines layer | none | OpenRailwayMap and public transport tiles, keyless | G13 |
+| Air quality layer | none | Open-Meteo air quality (CAMS), keyless | G13 |
+| Wildfires layer | NASA FIRMS (free key) | | have |
+| Street View | none | as G5 | G5 |
+| Saved lists | bookmarks, watchlist, camera favourites | scenarios (12.6 task 4) | have |
+| Offline maps | static build only | the live-app PWA (12.6 task 8) | plan 12.6 |
+| Ask Maps (Gemini) | the assistant, with place search as a tool | | have |
+| Timeline, location sharing | none | not planned: it records where a person goes |  |
+| Immersive Navigation | none | not planned for a desktop globe; the route over 3D tiles comes with G1 and G6 |  |
+
+What only this application has against both: the whole orbital side (catalog,
+conjunctions with Pc checked against NASA CARA, passes, the sky view, aurora),
+live aircraft and ships, conflict and country intelligence, 193,190 public
+cameras, 12.2 million summits with forecasts, and an assistant that runs on a
+local model. Google Earth draws none of it.
+
+### 13.4 Google Earth's paid plans (2026-11-20)
+
+Since 2025-10-01 Google Earth has sold plans through Google Maps Platform. Standard is $0. Professional is $75 per user per month and Professional Advanced is $150 ([plans](https://developers.google.com/maps/documentation/earth/earth-plans)). Google Earth Pro on the desktop stays free until its downloads stop on 2027-06-25 ([versions](https://www.google.com/earth/about/versions/)).
+
+The rows below are what the money buys, plus the free web features added in 2024 to 2026 that section 13.2 did not list. The Task column refers to the parity plan (local, `docs/superpowers/plans/2026-11-20-google-parity.md`). Every row is built here without paying.
+
+| Google Earth feature | Plan | Here | Task |
+|---|---|---|---|
+| Ask Google Earth (Gemini), with the view as context | all, higher limits paid | Claude on the owner's own subscription, owner-only, drives the globe and reads a snapshot of the view | A1 to A4 |
+| Imagery search with a vision model (US) | Professional and up | Claude reads the view in sight; searching a whole region is out | A3 |
+| 20 m contours, slope, aspect, cut and fill, profile statistics | Professional / free web (limited) | free terrain | G4, P3 |
+| Flood history | Professional | JRC Global Surface Water | P1 |
+| Population, land cover, forest, surface water, land surface temperature, census tracts | Standard | GIBS, ESA WorldCover, Hansen, JRC, TIGERweb | P1 |
+| Building footprints | Professional Advanced | OpenStreetMap | G1 |
+| Hydrants, street lights, stop and speed signs, storm drains, maintenance covers, traffic lights | Professional Advanced | OpenStreetMap tags | G10 |
+| EV charging | Professional Advanced | OpenStreetMap | G7 |
+| Building and solar designs | all, quota by plan | PVGIS yield for any drawn roof | P5 |
+| Imports up to 20 GB: KML, KMZ, GeoJSON, shapefile, CSV, Sheets, GLB; data table and styling | quota by plan | in the browser, 20,000 features drawn, more clustered | P2 |
+| Historical imagery, detect change | free web | Esri Wayback, Sentinel-2 yearly | G3 |
+| Historical Street View | free web | dated Panoramax and Mapillary captures | P7 |
+| 15-day weather overlay | free web | Open-Meteo 16-day grid | P6 |
+| Flight simulator | free web and desktop | | G11 |
+| Movie Maker, high-resolution print | desktop | canvas capture at up to 4x, WebM recording | P4 |
+| Address geocoding from a spreadsheet, GeoTIFF drape | desktop | Nominatim batch at 1 a second, geotiff.js | P2 |
+| Parcels and tax lots, zoning, vehicle and cycling trips, signal level of service | Professional and up | out: no free global data | |
+| Classify (Random Forest over AlphaEarth embeddings) | free web | out: the embeddings need Earth Engine | |
+| Gemini image generation over imagery | free web | out on purpose: made-up pictures of real places | |
+| Drive-style sharing with roles | all | out for a personal app: share links and files | |

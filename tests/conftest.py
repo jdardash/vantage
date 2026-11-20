@@ -103,3 +103,73 @@ def _no_real_tle_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     """Several tests run the real app lifespan, which loads SDA_TLE_CACHE_DIR
     when it is set. A developer's cache must never leak into a test catalog."""
     monkeypatch.delenv("SDA_TLE_CACHE_DIR", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_satcat_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The app lifespan loads the SATCAT cache from SDA_SATCAT_DIR (default the user
+    cache dir). Tests read an empty scratch directory instead of a developer's copy."""
+    monkeypatch.setenv("SDA_SATCAT_DIR", str(tmp_path_factory.getbasetemp() / "satcat-empty"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_peak_catalog(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The peaks routes open peaks.sqlite under SDA_PEAK_DIR (default the user cache
+    dir, 1.2 GB once imported). Tests see an empty scratch directory unless a test
+    points the variable somewhere itself."""
+    monkeypatch.setenv("SDA_PEAK_DIR", str(tmp_path_factory.getbasetemp() / "peaks-empty"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_sanctions_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The sanctions routes read the OFAC and UK lists cached under SDA_SANCTIONS_DIR
+    (default the user cache dir). Tests see an empty scratch directory instead."""
+    monkeypatch.setenv("SDA_SANCTIONS_DIR",
+                       str(tmp_path_factory.getbasetemp() / "sanctions-empty"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_intel_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Country intel keeps the Natural Earth borders under SDA_INTEL_DIR (default the
+    user cache dir). Tests see an empty scratch directory instead."""
+    monkeypatch.setenv("SDA_INTEL_DIR", str(tmp_path_factory.getbasetemp() / "intel-empty"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_infra_catalog(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The infrastructure routes open infra.sqlite and the cable cache under
+    SDA_INFRA_DIR (default the user cache dir). Tests see an empty scratch directory."""
+    monkeypatch.setenv("SDA_INFRA_DIR", str(tmp_path_factory.getbasetemp() / "infra-empty"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_conflict_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The conflict layer keeps its caches and the 230 MB UCDP store under
+    SDA_CONFLICT_DIR (default the user cache dir). Tests see an empty scratch
+    directory and start with no cached answers or open store."""
+    from sda import conflict as cf
+
+    monkeypatch.setenv("SDA_CONFLICT_DIR", str(tmp_path_factory.getbasetemp() / "conflict-empty"))
+    cf.clear_caches()
+    cf.reset_store()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_aviation_state() -> None:
+    """sda.aviation keeps a daily adsb.lol budget and lookup caches in module state,
+    read by the aviation and search routes. Each test starts from a clean slate."""
+    from sda import aviation
+
+    aviation.reset_state()

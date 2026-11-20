@@ -132,6 +132,40 @@ class MonteCarloRequest(BaseModel):
     bstar_sigma_fraction: float = Field(default=0.1, ge=0.0, le=1.0)
 
 
+class DecayForecastUse(BaseModel):
+    """How a daily F10.7 and Ap forecast entered a decay estimate."""
+    first_day: str | None = Field(description="First forecast day integrated (ISO date)")
+    last_day: str | None = Field(description="Last forecast day integrated (ISO date)")
+    days_used: int = Field(
+        description="Calendar days integrated inside the forecast window before reentry or "
+        "window end, gap days between listed days included; a day only partly spent (the "
+        "epoch day, the reentry day) counts as one"
+    )
+    reentry_within_window: bool
+    reentry_before_forecast: bool = Field(
+        description="Reentry falls before the first forecast day, so the forecast was not reached"
+    )
+    f107_min: float | None
+    f107_max: float | None
+    peak_ap: float | None
+    storm_days: int = Field(
+        description="Integrated days with daily Ap at or above 30 (minor storm); a day only "
+        "partly spent counts as one"
+    )
+    f107_after_window: float
+    ap_after_window: float = Field(description="Daily Ap after the forecast window (Ap 8)")
+    ap_reference: float
+    ap_scaling: str
+    tle_epoch: str = Field(description="Instant the integration starts: the TLE epoch (ISO)")
+    counted_from: str = Field(
+        description="Instant the lifetime is counted from: the later of the TLE epoch and start"
+    )
+    tle_age_days: float = Field(description="Days from the TLE epoch to counted_from")
+    reentry_before_counted_from: bool = Field(
+        description="The elements predict reentry before counted_from (lifetime floored at 1 day)"
+    )
+
+
 class DecayEstimate(BaseModel):
     """Orbital decay and lifetime estimate."""
     norad_id: int
@@ -147,6 +181,7 @@ class DecayEstimate(BaseModel):
     estimated_lifetime_category: str
     reentry_risk: str
     solar_activity_note: str
+    space_weather_forecast: DecayForecastUse | None = None
 
 
 class ManeuverOption(BaseModel):

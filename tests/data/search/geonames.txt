@@ -1,0 +1,3 @@
+1283416	Mount Everest	Mount Everest	Chomolungma,Sagarmatha	27.98806	86.92528	T	PK	NP		01				0	8848	8724	UTC	2024-01-01
+5808276	Mount Rainier	Mount Rainier	Tahoma	46.8528	-121.7604	T	PK	US		WA				0	4392	4380	UTC	2024-01-01
+5370001	Mount Whitney	Mount Whitney	Whitney	36.579	-118.2925	T	PK	US		CA				0	4421	4390	UTC	2024-01-01

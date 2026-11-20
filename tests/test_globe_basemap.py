@@ -43,7 +43,9 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 function makeWorld() {
   const layers = [];
   const log = { intel: [], destroyed: [] };
-  const buttons = ['earth', 'daynight', 'night', 'hires'].map(function (name) {
+  const buttons = ['earth', 'daynight', 'night', 'hires', 'hybrid', 'streets', 'topo', 'dark',
+    'photoreal']
+    .map(function (name) {
     const classes = new Set(name === 'earth' ? ['active'] : []);
     return {
       dataset: { basemap: name },
@@ -60,12 +62,19 @@ function makeWorld() {
   const box = {
     Cesium: {
       UrlTemplateImageryProvider: function (opts) { this.opts = opts; },
+      ImageryLayer: function (provider, opts) {
+        this.provider = provider; this.opts = opts || {};
+      },
       Credit: function (text) { this.text = text; },
       GeographicTilingScheme: function () { this.kind = 'geographic'; },
       WebMercatorTilingScheme: function () { this.kind = 'mercator'; },
     },
     viewer: {
       imageryLayers: {
+        add(layer, index) {
+          layers.splice(index === undefined ? layers.length : index, 0, layer);
+          return layer;
+        },
         addImageryProvider(provider, index) {
           const layer = { provider: provider };
           layers.splice(index === undefined ? layers.length : index, 0, layer);
@@ -104,6 +113,8 @@ function makeWorld() {
           tileWidth: o.tileWidth === undefined ? null : o.tileWidth,
           credit: o.credit ? o.credit.text : null,
           dayAlpha: layer.dayAlpha === undefined ? null : layer.dayAlpha,
+          minLevel: layer.opts && layer.opts.minimumTerrainLevel !== undefined
+            ? layer.opts.minimumTerrainLevel : null,
         };
       }),
       active: buttons.filter(function (b) { return b.classList.contains('active'); })
@@ -163,12 +174,16 @@ names.forEach(function (name) {
 
 (function () {
   const w = makeWorld();
-  w.box.setBasemap('hires');
-  w.box.lockBasemap('Google Photorealistic 3D Tiles');
-  const locked = w.snapshot();
+  const calls = [];
+  w.box.SDABuildings3D = { setCityMode: function (on) { calls.push(on); } };
+  w.box.setBasemap('photoreal');
+  const city = w.snapshot();
   w.box.setBasemap('earth');
-  w.box.cycleBasemap();
-  out.lock = { locked: locked, after: w.snapshot() };
+  out.city = { city: city, after: w.snapshot(), calls: calls };
+  // Before the 3D module is on the page the switch still works.
+  const bare = makeWorld();
+  bare.box.setBasemap('photoreal');
+  out.city.bare = bare.snapshot().current;
 })();
 
 process.stdout.write(JSON.stringify(out));
@@ -197,8 +212,14 @@ def run() -> dict:
     return json.loads(done.stdout)
 
 
+ALL_BASEMAPS = [
+    "earth", "daynight", "night", "hires", "hybrid", "streets", "topo", "dark", "photoreal",
+]
+ESRI_TILES = "https://services.arcgisonline.com/arcgis/rest/services/"
+
+
 def test_registry_and_default(run):
-    assert run["names"] == ["earth", "daynight", "night", "hires"]
+    assert run["names"] == ALL_BASEMAPS
     assert run["defaultName"] == "earth"
     assert run["initial"] == "earth"
 
@@ -210,8 +231,8 @@ def test_nasa_layers_use_the_grid_cesium_expects(run, name):
     Naming a tiling scheme here, or going back to the epsg4326 endpoint, is what
     shrank the world and slid it into the north-west corner of the globe.
     """
-    layers = run["each"][name]["layers"]
-    assert layers, f"{name} put no imagery on the globe"
+    layers = [x for x in run["each"][name]["layers"] if x["url"].startswith(GIBS_MERCATOR)]
+    assert layers, f"{name} put no NASA imagery on the globe"
     for layer in layers:
         assert layer["url"].startswith(GIBS_MERCATOR), layer["url"]
         assert "/GoogleMapsCompatible_Level8/{z}/{y}/{x}." in layer["url"]
@@ -232,7 +253,7 @@ def test_no_basemap_names_a_tiling_scheme_or_a_credential(run):
 
 def test_each_basemap_stacks_the_layers_it_promises(run):
     each = run["each"]
-    assert [len(each[name]["layers"]) for name in run["names"]] == [1, 2, 1, 1]
+    assert [len(each[name]["layers"]) for name in run["names"]] == [2, 3, 1, 1, 3, 1, 1, 2, 1]
 
     assert "BlueMarble_ShadedRelief_Bathymetry" in each["earth"]["layers"][0]["url"]
     assert each["earth"]["layers"][0]["url"].endswith(".jpeg")
@@ -240,8 +261,13 @@ def test_each_basemap_stacks_the_layers_it_promises(run):
     assert each["night"]["layers"][0]["url"].endswith(".png")
     assert "services.arcgisonline.com" in each["hires"]["layers"][0]["url"]
 
+    # Blue Marble from orbit, Esri imagery only once zoomed in to about 1 km a pixel.
+    orbit, close = each["earth"]["layers"]
+    assert orbit["minLevel"] is None
+    assert "World_Imagery" in close["url"] and close["minLevel"] == 7
+
     # Daylight underneath, city lights on top and switched off on the sunlit side.
-    day, lights = each["daynight"]["layers"]
+    day, _close, lights = each["daynight"]["layers"]
     assert "BlueMarble_ShadedRelief_Bathymetry" in day["url"]
     assert "VIIRS_Black_Marble" in lights["url"]
     assert day["dayAlpha"] is None
@@ -256,6 +282,11 @@ def test_only_the_day_night_basemap_lights_the_globe(run):
         "daynight": True,
         "night": False,
         "hires": False,
+        "hybrid": False,
+        "streets": False,
+        "topo": False,
+        "dark": False,
+        "photoreal": False,
     }
 
 
@@ -269,13 +300,30 @@ def test_choosing_a_basemap_updates_the_button_the_credit_and_the_feed(run):
     assert "Esri" in run["each"]["hires"]["credit"]
 
 
+def test_esri_basemaps_ride_the_default_grid_with_labels_on_top(run):
+    each = run["each"]
+    for name in ("hires", "hybrid", "streets", "topo", "dark", "photoreal"):
+        for layer in each[name]["layers"]:
+            assert layer["url"].startswith(ESRI_TILES), (name, layer["url"])
+            assert layer["url"].endswith("/MapServer/tile/{z}/{y}/{x}"), layer["url"]
+            assert layer["tilingScheme"] is None
+            assert layer["credit"]
+    hybrid = [x["url"] for x in each["hybrid"]["layers"]]
+    assert "World_Imagery" in hybrid[0]
+    assert "Reference/World_Boundaries_and_Places" in hybrid[-1], "labels must be on top"
+    assert "World_Topo_Map" in each["topo"]["layers"][0]["url"]
+    assert "World_Street_Map" in each["streets"]["layers"][0]["url"]
+    base, labels = (x["url"] for x in each["dark"]["layers"])
+    assert "World_Dark_Gray_Base" in base and "World_Dark_Gray_Reference" in labels
+
+
 def test_switching_replaces_the_old_layers_and_can_be_quiet(run):
     before, after = run["swap"]["before"], run["swap"]["after"]
-    assert len(before["layers"]) == 2
-    assert len(after["layers"]) == 1
+    assert len(before["layers"]) == 3
+    assert len(after["layers"]) == 2
     assert "BlueMarble" in after["layers"][0]["url"]
-    # Both day / night layers were removed, and destroyed so their tiles are freed.
-    assert after["destroyed"] == [True, True]
+    # All three day / night layers were removed, and destroyed so their tiles are freed.
+    assert after["destroyed"] == [True, True, True]
     assert after["lighting"] is False
     assert after["intel"] == before["intel"], "a quiet switch must not write to the feed"
 
@@ -290,17 +338,21 @@ def test_a_name_from_a_share_link_cannot_break_the_page(run):
 
 
 def test_the_i_key_walks_every_basemap_and_wraps(run):
-    assert run["cycle"] == ["daynight", "night", "hires", "earth", "daynight"]
+    assert run["cycle"] == ALL_BASEMAPS[1:] + ["earth", "daynight"]
 
 
-def test_google_tiles_take_the_basemap_switch_out_of_play(run):
-    """Google's photorealistic tiles replace the globe surface. The buttons
-    must not go on claiming a NASA basemap that is no longer on screen."""
-    locked, after = run["lock"]["locked"], run["lock"]["after"]
-    assert locked["active"] == []
-    assert locked["disabled"] == ["earth", "daynight", "night", "hires"]
-    assert locked["credit"] == "Imagery: Google Photorealistic 3D Tiles"
-    assert after == locked, "a locked switch ignores both the buttons and the I key"
+def test_photoreal_hands_the_city_to_the_3d_module(run):
+    """PHOTOREAL 3D turns static/js/buildings3d.js on (Google's tiles or OSM
+    buildings over Esri imagery); any other basemap turns it off again, so the
+    switch is never locked and the active button always names what is shown."""
+    city = run["city"]
+    assert city["city"]["current"] == "photoreal" and city["city"]["active"] == ["photoreal"]
+    assert city["city"]["disabled"] == []
+    assert "World_Imagery" in city["city"]["layers"][0]["url"]
+    assert "OpenStreetMap" in city["city"]["credit"]
+    assert city["after"]["current"] == "earth"
+    assert city["calls"] == [True, False]
+    assert city["bare"] == "photoreal"
 
 
 def test_browser_shortcuts_do_not_trigger_globe_keys():

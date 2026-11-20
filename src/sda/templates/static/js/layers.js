@@ -80,7 +80,7 @@
       key: 'gdelt', label: 'News mentions', endpoint: '/api/gdelt', kind: 'points',
       listKey: 'events', type: 'news event', params: 'none', select: 'rank',
       color: '#c58bff', size: 6, cap: DEFAULT_CAP, keyEnv: '', keyHint: '',
-      source: 'GDELT Project GEO 2.1 (query: satellite)', refreshS: 600
+      source: 'GDELT Project 2.0 events, last hour, grouped by place', refreshS: 300
     },
     {
       key: 'radio', label: 'Radio stations', endpoint: '/api/radio', kind: 'points',
@@ -458,6 +458,18 @@
       var count = finiteOrNull(typeof r.count === 'string' ? Number(r.count) : r.count);
       var rows = [];
       if (count !== null) rows.push(['ARTICLES', String(Math.round(count))]);
+      var events = finiteOrNull(r.events);
+      if (events !== null) rows.push(['EVENTS', String(Math.round(events))]);
+      addRow(rows, 'TOP EVENT', r.event, 80);
+      var conflict = finiteOrNull(r.conflict);
+      if (conflict !== null && conflict > 0) rows.push(['CONFLICT EVENTS', String(Math.round(conflict))]);
+      var tone = finiteOrNull(r.tone);
+      if (tone !== null) rows.push(['TONE', tone.toFixed(1)]);
+      addRow(rows, 'LATEST (UTC)', r.date, 40);
+      // Shown as text only; the page never turns a feed value into a link.
+      if (typeof r.source_url === 'string' && /^https?:\/\//i.test(r.source_url)) {
+        addRow(rows, 'ARTICLE', r.source_url, 200);
+      }
       return makePoint(cleanText(r.name, 120) || 'Unnamed place', r.lat, r.lon, count, rows);
     },
 

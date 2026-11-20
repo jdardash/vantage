@@ -13,7 +13,7 @@
 //     demo. The live FastAPI app must keep serving fresh data, so it never
 //     installs a worker.
 
-var CACHE_VERSION = 'worldview-demo-v5';
+var CACHE_VERSION = 'worldview-demo-v32';
 
 // Paths are relative to the worker's own scope, which is the demo root: the
 // build copies this file next to index.html precisely so the scope covers the
@@ -31,6 +31,32 @@ var SHELL = [
   './static/js/isscam.js',
   './static/js/categories.js',
   './static/js/conjactions.js',
+  './static/js/cameras.js',
+  './static/js/skyview.js',
+  './static/js/aurora.js',
+  './static/js/nasaimagery.js',
+  './static/js/summit.js',
+  './static/js/dossier.js',
+  './static/js/spaceweather.js',
+  './static/js/weather.js',
+  './static/js/maptools.js',
+  './static/js/peaks.js',
+  './static/js/maritime.js',
+  './static/js/intel.js',
+  './static/js/aviation.js',
+  './static/js/infra.js',
+  './static/js/orbitviz.js',
+  './static/js/viewmode.js',
+  './static/js/camwall.js',
+  './static/js/omnisearch.js',
+  './static/js/whatshere.js',
+  './static/js/models.js',
+  './static/js/visuals.js',
+  './static/js/clouds.js',
+  './static/js/tour.js',
+  './static/js/presentation.js',
+  './static/js/conflict.js',
+  './static/data/sky.json',
   './static/manifest.webmanifest',
   './static/icon.svg',
   './static/icon-maskable.svg',
