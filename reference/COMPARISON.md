@@ -858,3 +858,32 @@ conjunctions with Pc checked against NASA CARA, passes, the sky view, aurora),
 live aircraft and ships, conflict and country intelligence, 193,190 public
 cameras, 12.2 million summits with forecasts, and an assistant that runs on a
 local model. Google Earth draws none of it.
+
+### 13.4 Google Earth's paid plans (2026-11-20)
+
+Since 2025-10-01 Google Earth has sold plans through Google Maps Platform. Standard is $0. Professional is $75 per user per month and Professional Advanced is $150 ([plans](https://developers.google.com/maps/documentation/earth/earth-plans)). Google Earth Pro on the desktop stays free until its downloads stop on 2027-06-25 ([versions](https://www.google.com/earth/about/versions/)).
+
+The rows below are what the money buys, plus the free web features added in 2024 to 2026 that section 13.2 did not list. The Task column refers to the parity plan (local, `docs/superpowers/plans/2026-11-20-google-parity.md`). Every row is built here without paying.
+
+| Google Earth feature | Plan | Here | Task |
+|---|---|---|---|
+| Ask Google Earth (Gemini), with the view as context | all, higher limits paid | Claude on the owner's own subscription, owner-only, drives the globe and reads a snapshot of the view | A1 to A4 |
+| Imagery search with a vision model (US) | Professional and up | Claude reads the view in sight; searching a whole region is out | A3 |
+| 20 m contours, slope, aspect, cut and fill, profile statistics | Professional / free web (limited) | free terrain | G4, P3 |
+| Flood history | Professional | JRC Global Surface Water | P1 |
+| Population, land cover, forest, surface water, land surface temperature, census tracts | Standard | GIBS, ESA WorldCover, Hansen, JRC, TIGERweb | P1 |
+| Building footprints | Professional Advanced | OpenStreetMap | G1 |
+| Hydrants, street lights, stop and speed signs, storm drains, maintenance covers, traffic lights | Professional Advanced | OpenStreetMap tags | G10 |
+| EV charging | Professional Advanced | OpenStreetMap | G7 |
+| Building and solar designs | all, quota by plan | PVGIS yield for any drawn roof | P5 |
+| Imports up to 20 GB: KML, KMZ, GeoJSON, shapefile, CSV, Sheets, GLB; data table and styling | quota by plan | in the browser, 20,000 features drawn, more clustered | P2 |
+| Historical imagery, detect change | free web | Esri Wayback, Sentinel-2 yearly | G3 |
+| Historical Street View | free web | dated Panoramax and Mapillary captures | P7 |
+| 15-day weather overlay | free web | Open-Meteo 16-day grid | P6 |
+| Flight simulator | free web and desktop | | G11 |
+| Movie Maker, high-resolution print | desktop | canvas capture at up to 4x, WebM recording | P4 |
+| Address geocoding from a spreadsheet, GeoTIFF drape | desktop | Nominatim batch at 1 a second, geotiff.js | P2 |
+| Parcels and tax lots, zoning, vehicle and cycling trips, signal level of service | Professional and up | out: no free global data | |
+| Classify (Random Forest over AlphaEarth embeddings) | free web | out: the embeddings need Earth Engine | |
+| Gemini image generation over imagery | free web | out on purpose: made-up pictures of real places | |
+| Drive-style sharing with roles | all | out for a personal app: share links and files | |
