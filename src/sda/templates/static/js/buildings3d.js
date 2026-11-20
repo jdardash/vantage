@@ -27,6 +27,9 @@
   var BOX_STEP_DEG = 0.005;   // box centres snap to this grid so nearby views share a box
   var BOX_HALF_DEG = 0.0075;  // a 0.015 degree box, inside the server's 0.02 limit
   var KEEP_BOXES = 4;
+  // Google tiles that fail this many times with no tile loaded in between mean the
+  // session or the network is gone; one stray failure does not end the mesh.
+  var TILE_FAILS_TO_FALL_BACK = 3;
   var R2D = 180 / Math.PI;
 
   var FAIL_TEXT = 'Google 3D tiles did not load (free monthly allowance used, or no network); ' +
@@ -145,7 +148,11 @@
     var scene = viewer.scene;
     var camera = viewer.camera;
     var base = typeof ctx.api === 'string' ? ctx.api : '';
-    var m = { on: false, layer: null, gen: 0, tileset: null, ds: null, boxes: [], refs: {},
+    // route: what this entry asked for; layer: what is on screen (osm after a fallback).
+    // tileset is kept, hidden, between entries so each page spends one root load;
+    // pending is a tileset still on its way.
+    var m = { on: false, route: null, layer: null, gen: 0, tileset: null, tileRoute: null,
+      tileFails: 0, tileUnhook: [], pending: null, ds: null, boxes: [], refs: {},
       loading: null, clamped: [], status: '', destroyed: false };
     var ui = {};
     var unhook = [];
@@ -468,54 +475,135 @@
       return refreshOsm();
     }
 
+    // -------- the Google tileset's life
+
+    function destroyTileset(t) {
+      try {
+        if (t && typeof t.destroy === 'function' &&
+            !(typeof t.isDestroyed === 'function' && t.isDestroyed())) t.destroy();
+      } catch (err) { /* already gone */ }
+    }
+
+    // Off the scene and destroyed, so the next entry asks Google for a new one.
+    function dropTileset() {
+      var t = m.tileset;
+      if (!t) return;
+      m.tileUnhook.forEach(function (fn) { try { fn(); } catch (err) { /* gone */ } });
+      m.tileUnhook = [];
+      m.tileset = null;
+      m.tileRoute = null;
+      m.tileFails = 0;
+      // Cesium's primitive collection destroys what it removes; destroyTileset covers the rest.
+      try { scene.primitives.remove(t); } catch (err) { /* never added */ }
+      destroyTileset(t);
+    }
+
+    function listen(evt, fn) {
+      if (!evt || typeof evt.addEventListener !== 'function') return;
+      var off = evt.addEventListener(fn);
+      m.tileUnhook.push(typeof off === 'function' ? off : function () {
+        if (typeof evt.removeEventListener === 'function') evt.removeEventListener(fn);
+      });
+    }
+
+    function adoptTileset(tileset, route) {
+      m.tileset = tileset;
+      m.tileRoute = route;
+      m.tileFails = 0;
+      listen(tileset.tileLoad, function () { m.tileFails = 0; });
+      listen(tileset.tileFailed, function () { onTileFailed(tileset); });
+      scene.primitives.add(tileset);
+    }
+
+    // A tile that fails after the root has loaded (network gone, Google's session
+    // expired on a page left open, 429s) would leave black ground under a hidden
+    // globe; past a few failures in a row the city goes back to OpenStreetMap.
+    // Cesium can raise tileFailed from inside the tileset's own update, so the
+    // tileset is dropped on the next turn rather than destroyed under its caller.
+    function onTileFailed(tileset) {
+      if (tileset !== m.tileset || m.tileFails >= TILE_FAILS_TO_FALL_BACK) return;
+      m.tileFails++;
+      if (m.tileFails < TILE_FAILS_TO_FALL_BACK) return;
+      global.setTimeout(function () {
+        if (tileset !== m.tileset) return;
+        dropTileset();
+        if (m.on && m.layer !== 'osm') fallBack();
+      }, 0);
+    }
+
+    function fallBack() {
+      showCesiumCredits(false);
+      clampGround(false);
+      say(FAIL_TEXT);
+      return startOsm().then(function () {
+        if (m.status.indexOf(FAIL_TEXT) < 0) setStatus(FAIL_TEXT + ' ' + m.status);
+        return m.layer;
+      });
+    }
+
+    function showGoogle() {
+      var route = m.tileRoute;
+      m.tileset.show = true;
+      scene.globe.show = false;   // the tiles cover the ground; the globe under them would z-fight
+      m.layer = route;
+      setCredit(CREDITS[route]);
+      showCesiumCredits(true);
+      clampGround(true);
+      setStatus(CREDITS[route].replace('Imagery: ', '') + '. Click two points with the map ' +
+        'tools HGT measure for a height.');
+      var hidden = hiddenBy3D(overlayState());
+      if (hidden.length) {
+        intel('Photorealistic 3D hides ' + joinNames(hidden) + ': draped imagery lies on the ' +
+          'globe surface, which the 3D tiles replace.');
+      }
+      if (scene.requestRender) scene.requestRender();
+      return route;
+    }
+
+    // One root request per page: a kept tileset is shown again, a load already on
+    // its way is waited for, and a tileset that lands after the city was left is
+    // destroyed rather than kept.
+    function startGoogle(route) {
+      if (m.tileset && m.tileRoute === route) return Promise.resolve(showGoogle());
+      dropTileset();
+      setStatus('Loading Google Photorealistic 3D Tiles...');
+      if (m.pending && m.pending.route === route) return m.pending.done;
+      var job = { route: route };
+      job.done = loadGoogle(route).then(function (tileset) {
+        if (m.pending === job) m.pending = null;
+        if (m.destroyed || !m.on || m.route !== route) {
+          destroyTileset(tileset);
+          return m.layer;
+        }
+        adoptTileset(tileset, route);
+        return showGoogle();
+      }, function () {
+        if (m.pending === job) m.pending = null;
+        if (m.destroyed || !m.on || m.route !== route) return m.layer;
+        return fallBack();
+      });
+      m.pending = job;
+      return job.done;
+    }
+
     // -------- city mode on and off
 
     function enter() {
-      var gen = ++m.gen;
+      ++m.gen;
       m.on = true;
       var route = chooseCityLayer(config);
+      m.route = route;
       setNote(route === 'osm');
       if (route === 'osm') return startOsm().then(function () { return m.layer; });
-      setStatus('Loading Google Photorealistic 3D Tiles...');
-      return loadGoogle(route).then(function (tileset) {
-        if (gen !== m.gen || !m.on) {
-          try { scene.primitives.remove(tileset); } catch (err) { /* never added */ }
-          return m.layer;
-        }
-        m.tileset = tileset;
-        scene.primitives.add(tileset);
-        scene.globe.show = false;   // the tiles cover the ground; the globe under them would z-fight
-        m.layer = route;
-        setCredit(CREDITS[route]);
-        showCesiumCredits(true);
-        clampGround(true);
-        setStatus(CREDITS[route].replace('Imagery: ', '') + '. Click two points with the map ' +
-          'tools HGT measure for a height.');
-        var hidden = hiddenBy3D(overlayState());
-        if (hidden.length) {
-          intel('Photorealistic 3D hides ' + joinNames(hidden) + ': draped imagery lies on the ' +
-            'globe surface, which the 3D tiles replace.');
-        }
-        if (scene.requestRender) scene.requestRender();
-        return route;
-      }, function () {
-        if (gen !== m.gen || !m.on) return m.layer;
-        say(FAIL_TEXT);
-        return startOsm().then(function () {
-          if (m.status.indexOf(FAIL_TEXT) < 0) setStatus(FAIL_TEXT + ' ' + m.status);
-          return m.layer;
-        });
-      });
+      return startGoogle(route);
     }
 
     function leave() {
       m.gen++;
       m.on = false;
+      m.route = null;
       m.loading = null;
-      if (m.tileset) {
-        try { scene.primitives.remove(m.tileset); } catch (err) { /* already gone */ }
-        m.tileset = null;
-      }
+      if (m.tileset) m.tileset.show = false;   // kept for the next entry
       scene.globe.show = true;
       showCesiumCredits(false);
       clampGround(false);
@@ -544,6 +632,7 @@
     function destroy() {
       m.destroyed = true;
       leave();
+      dropTileset();
       unhook.forEach(function (fn) { try { fn(); } catch (err) { /* gone */ } });
       if (m.ds) { try { viewer.dataSources.remove(m.ds, true); } catch (err) { /* gone */ } }
       if (ui.root && ui.root.parentNode) ui.root.parentNode.removeChild(ui.root);
@@ -559,8 +648,12 @@
       setCityMode: setCityMode,
       refresh: refreshOsm,
       configChanged: function () {
-        setNote(chooseCityLayer(config) === 'osm');
+        var route = chooseCityLayer(config);
+        setNote(route === 'osm');
+        if (m.tileset && m.tileRoute !== route) dropTileset();
         if (!m.on) return Promise.resolve(null);
+        // Same route as this entry asked for: nothing to redo (no second Overpass box).
+        if (route === m.route) return Promise.resolve(m.layer);
         return leave().then(enter);
       },
       destroy: destroy

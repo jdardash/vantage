@@ -38,13 +38,29 @@ Cesium.Cartesian3.fromDegreesArray = function (flat) {
 Cesium.Ion = { defaultAccessToken: undefined };
 var TILE_CALLS = [];
 var TILES_FAIL = false;
+var TILES_DEFER = false;   // hold the tileset back until RELEASE_TILES() is called
+var HELD = [];
+var TILESETS = [];
+function fakeTileset() {
+  var t = { kind: 'google-tiles', show: true, destroyed: false,
+    tileFailed: new Event(), tileLoad: new Event(),
+    destroy: function () { this.destroyed = true; },
+    isDestroyed: function () { return this.destroyed; } };
+  TILESETS.push(t);
+  return t;
+}
+function RELEASE_TILES() { HELD.splice(0).forEach(function (fn) { fn(); }); }
 Cesium.createGooglePhotorealistic3DTileset = function (key, opts) {
   TILE_CALLS.push({ key: key === undefined ? null : key,
     ion: Cesium.Ion.defaultAccessToken || null,
     credits: !!(opts && opts.showCreditsOnScreen) });
   if (TILES_FAIL) return Promise.reject(new Error('RuntimeError: quota'));
-  return Promise.resolve({ kind: 'google-tiles' });
+  var t = fakeTileset();
+  if (!TILES_DEFER) return Promise.resolve(t);
+  return new Promise(function (resolve) { HELD.push(function () { resolve(t); }); });
 };
+function failTile() { v.scene.primitives.list[0].tileFailed.raiseEvent(
+  { url: 'https://tile.googleapis.com/v1/3dtiles/datasets/x.glb', message: '429' }); }
 var INTEL = [];
 var v = makeViewer();
 v.creditDisplay = { container: new El('div') };
@@ -146,7 +162,7 @@ var on = { layer: SDABuildings3D.state().layer, globe: v.scene.globe.show,
   hiddenSaid: INTEL.filter(function (t) { return t.indexOf('hides') >= 0; }) };
 await SDABuildings3D.setCityMode(false);
 return { on: on, off: { layer: SDABuildings3D.state().layer, globe: v.scene.globe.show,
-  primitives: v.scene.primitives.list.length,
+  primitives: v.scene.primitives.list.length, tilesShown: TILESETS[0].show,
   creditsShown: !!v.creditDisplay.container.parentNode } };
 """)
 
@@ -241,6 +257,91 @@ await SDABuildings3D.setCityMode(false);
 return { on: on, off: pin.point.heightReference === undefined };
 """)
 
+scenario("tile_failed", r"""
+setCamera(v, 8.58719, 12.00949, 465);
+SDABuildings3D.init(ctx);
+SDABuildings3D.setConfig({ cesium_ion_token: 'free-token' });
+await SDABuildings3D.setCityMode(true);
+await settle();
+var t = TILESETS[0];
+// One stray failure, or two after a tile loaded, leave the mesh up.
+failTile();
+t.tileLoad.raiseEvent({});
+failTile(); failTile();
+await settle();
+var held = { layer: SDABuildings3D.state().layer, globe: v.scene.globe.show,
+  said: INTEL.indexOf(SDABuildings3D.FAIL_TEXT) >= 0 };
+// A third failure with no tile loaded since: the session is gone, so OSM takes over.
+failTile();
+await settle();
+var fell = { layer: SDABuildings3D.state().layer, globe: v.scene.globe.show,
+  said: INTEL.indexOf(SDABuildings3D.FAIL_TEXT) >= 0,
+  status: mount.textContent.indexOf(SDABuildings3D.FAIL_TEXT) >= 0,
+  destroyed: t.destroyed, primitives: v.scene.primitives.list.length,
+  creditsShown: !!v.creditDisplay.container.parentNode,
+  buildings: ents().length, tileCalls: TILE_CALLS.length };
+// The next entry asks Google again with a fresh tileset.
+await SDABuildings3D.setCityMode(false);
+await SDABuildings3D.setCityMode(true);
+await settle();
+var again = { layer: SDABuildings3D.state().layer, tileCalls: TILE_CALLS.length,
+  primitives: v.scene.primitives.list.length, fresh: v.scene.primitives.list[0] !== t };
+return { held: held, fell: fell, again: again };
+""")
+
+scenario("reenter", r"""
+setCamera(v, 8.58719, 12.00949, 465);
+SDABuildings3D.init(ctx);
+SDABuildings3D.setConfig({ cesium_ion_token: 'free-token' });
+var seen = [];
+for (var i = 0; i < 3; i++) {
+  await SDABuildings3D.setCityMode(true);
+  await settle();
+  seen.push([SDABuildings3D.state().layer, v.scene.globe.show, TILESETS[0].show]);
+  await SDABuildings3D.setCityMode(false);
+  seen.push([SDABuildings3D.state().layer, v.scene.globe.show, TILESETS[0].show]);
+}
+return { seen: seen, tileCalls: TILE_CALLS.length, primitives: v.scene.primitives.list.length,
+  destroyed: TILESETS[0].destroyed };
+""")
+
+scenario("config_same", r"""
+setCamera(v, 8.58719, 12.00949, 465);
+SDABuildings3D.init(ctx);
+// A share link with bm=photoreal opens the city before /api/config has answered.
+await SDABuildings3D.setCityMode(true);
+await settle();
+var first = buildingCalls().length;
+await SDABuildings3D.setConfig({ cesium_ion_token: null, google_maps_api_key: null });
+await settle();
+return { first: first, after: buildingCalls().length, count: ents().length,
+  layer: SDABuildings3D.state().layer };
+""")
+
+scenario("late_tileset", r"""
+setCamera(v, 8.58719, 12.00949, 465);
+TILES_DEFER = true;
+SDABuildings3D.init(ctx);
+SDABuildings3D.setConfig({ cesium_ion_token: 'free-token' });
+// Passing through PHOTOREAL 3D before the tiles arrive: the late tileset is destroyed.
+SDABuildings3D.setCityMode(true);
+await SDABuildings3D.setCityMode(false);
+RELEASE_TILES();
+await settle();
+var late = { destroyed: TILESETS[0].destroyed, primitives: v.scene.primitives.list.length,
+  globe: v.scene.globe.show, layer: SDABuildings3D.state().layer };
+// Leaving and coming back while the tiles are on their way waits for the same load.
+SDABuildings3D.setCityMode(true);
+await SDABuildings3D.setCityMode(false);
+var back = SDABuildings3D.setCityMode(true);
+RELEASE_TILES();
+await back;
+await settle();
+return { late: late, tileCalls: TILE_CALLS.length, layer: SDABuildings3D.state().layer,
+  kept: TILESETS[1].destroyed === false && v.scene.primitives.list[0] === TILESETS[1],
+  globe: v.scene.globe.show };
+""")
+
 
 @pytest.fixture(scope="module")
 def ran(tmp_path_factory):
@@ -285,7 +386,40 @@ def test_google_tiles_through_ion(ran):
     assert on["creditsShown"] is True
     assert len(on["hiddenSaid"]) == 1
     assert NASA_LABEL in on["hiddenSaid"][0] and RADAR_LABEL in on["hiddenSaid"][0]
-    assert off == {"layer": None, "globe": True, "primitives": 0, "creditsShown": False}
+    # Leaving hides the tileset and keeps it: the next entry costs no new root load.
+    assert off == {"layer": None, "globe": True, "primitives": 1, "tilesShown": False,
+                   "creditsShown": False}
+
+
+def test_tile_failures_after_load_fall_back_to_osm(ran):
+    r = value(ran, "tile_failed")
+    assert r["held"] == {"layer": "google-ion", "globe": False, "said": False}
+    fell = r["fell"]
+    assert fell["layer"] == "osm" and fell["globe"] is True
+    assert fell["said"] is True and fell["status"] is True
+    assert fell["destroyed"] is True and fell["primitives"] == 0
+    assert fell["creditsShown"] is False and fell["buildings"] == 2
+    assert fell["tileCalls"] == 1
+    # Google is tried again on the next entry, with a new tileset.
+    assert r["again"] == {"layer": "google-ion", "tileCalls": 2, "primitives": 1, "fresh": True}
+
+
+def test_reentering_photoreal_reuses_one_tileset(ran):
+    r = value(ran, "reenter")
+    assert r["tileCalls"] == 1 and r["primitives"] == 1 and r["destroyed"] is False
+    assert r["seen"] == [["google-ion", False, True], [None, True, False]] * 3
+
+
+def test_config_with_the_same_route_keeps_the_city(ran):
+    r = value(ran, "config_same")
+    assert r == {"first": 1, "after": 1, "count": 2, "layer": "osm"}
+
+
+def test_a_tileset_arriving_after_leave_is_destroyed(ran):
+    r = value(ran, "late_tileset")
+    assert r["late"] == {"destroyed": True, "primitives": 0, "globe": True, "layer": None}
+    assert r["tileCalls"] == 2
+    assert r["layer"] == "google-ion" and r["kept"] is True and r["globe"] is False
 
 
 def test_google_key_wins_over_ion(ran):
