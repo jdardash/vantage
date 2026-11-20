@@ -644,3 +644,217 @@ clicked 105 of them; none answered "Unknown". Getting there took five fixes:
 Ships were not clicked live: the vessel layer needs an AISStream key, and none
 is set on this machine. The vessel and chokepoint cards are covered by
 `tests/test_globe_maritime.py`.
+
+## 12. Are we better than all of them yet? (2026-11-20)
+
+The owner asked it plainly. Not yet.
+
+On depth the application is ahead of every open project and free site found: none
+of them computes Pc four ways with coded usage checks and reproduces NASA CARA's
+own cases, and none puts that on one globe with live aircraft and ships, conflict
+and country intelligence, 193,190 public cameras, every summit with a forecast,
+the sky from any point and dated NASA imagery. On a short list of named features
+it is still behind named rivals (12.3), five of those rivals pushed new work
+today (12.1), and against government and paid products it is behind on data that
+no amount of code creates (12.4).
+
+### 12.1 The rivals kept moving
+
+Checked through the GitHub API on 2026-11-20 against the commit each clone in
+`reference/` was read at. Only commit titles were read, so a row says what a rival
+claims to have added, not what its code does. Reading that code is task 0 of the
+plan in 12.6.
+
+| Repo | Last push | Commits since our read | What the new commits add |
+| --- | --- | --- | --- |
+| gods-eye-view | 2026-11-20 | 4,553 | in the newest 250, mostly upkeep; a host can name the layers a bare address opens with |
+| worldmonitor | 2026-11-20 | 4,373 | "Orbital Watch": watched ground sites, the satellites covering each, imagery before and after an event date, reservoir water extent; alerts when airline departures collapse in six countries |
+| keeptrack.space | 2026-11-20 | 1,078 | a Most Tracked menu, ISS and Tiangong modules merged into their host, visiting vehicles hidden while docked |
+| satvis | 2026-11-17 | 663 | an iOS app, ground stations added from a menu on the globe, a 24-hour sun-synchronous crossing chart |
+| Shadowbroker | 2026-11-20 | 301 | an OSM basemap behind a tile proxy |
+| osiris | 2026-11-20 | 39 | at least 2,148 more keyless road cameras (Italy 967, Idaho 416, France 405, Delaware 360, plus Virginia, Maryland, South Carolina and Bizkaia), keyless wind and rain, "AI Analyze" on camera frames, Shodan port scans |
+| satlas | 2026-09-10 | | quiet |
+| satguard | 2026-03-23 | | quiet |
+| worldview (shawn14) | 2026-03-03 | | quiet |
+| ThingsInSpace | 2024-01-09 | | renamed jeyoder/StuffInSpace; dormant |
+| spacetech-ssa | archived | | read-only on GitHub |
+| OrbitVoyage | gone | | the repository answers 404; the gap it set (12.3) stays on the list |
+
+worldmonitor's Orbital Watch is the first rival move onto this application's
+ground: which satellites see a place, and what they saw. It is AGPL, so it is an
+idea source only.
+
+### 12.2 Closed since section 9
+
+| Gap named in 9.3 | Rival | Closed by |
+| --- | --- | --- |
+| Weather layers | gods-eye-view | radar, animated wind, cyclone tracks and cones (`static/js/weather.js`) |
+| 3D aircraft models | gods-eye-view | six CC BY 4.0 models (`static/models/`, `static/js/models.js`) |
+| Polar plot, watchlist | keeptrack.space | `static/js/passpanel.js`, `static/js/orbitviz.js` |
+| Cloud and star layers, country mode | satlas | `static/js/clouds.js`, `static/js/skyview.js`, the country card (`intel.py`) |
+| Country labels, geopolitical alert zones | worldview (shawn14) | the country card, GDELT zones and the instability score (`intel.py`) |
+| Idle auto-hide panels | OrbitVoyage | `static/js/presentation.js` |
+| Phone control sheet | satlas | `static/js/presentation.js`: at 700 px wide or less the controls become a bottom sheet with a handle; not yet checked on a phone-sized browser (task 8) |
+| Objects cataloged since July 2026 (9.6) | keeptrack, Shadowbroker, satvis | the OMM reader (`omm.py`, section 10.1 row 1) |
+| Realtime voice | gods-eye-view | partly: browser speech in and out on the agent panel; no streaming voice model, which would need a paid API |
+| More OSINT layers | osiris, worldmonitor, Shadowbroker | partly: 19 globe layers and the six ARGOS tracks of section 11; worldmonitor still lists more |
+
+### 12.3 Still open, per rival
+
+| Rival | Open gap | Plan task (12.6) |
+| --- | --- | --- |
+| OrbitVoyage | conjunction events pushed to the page as they are found | 1 |
+| satguard | conjunction heatmap | 2 |
+| spacetech-ssa | CZML export | 3 |
+| keeptrack.space | saved scenarios | 4 |
+| satguard, keeptrack.space | Clohessy-Wiltshire tradespace, proximity operations (RPO) | 5 |
+| ARGOS ATLAS | drawn front lines in the 13 theatres shown as towns | 6 |
+| gods-eye-view | camera viewshed | 7 |
+| satvis | the PWA on the live app (ours installs only from the static build) | 8 |
+| satvis | pass notifications | 9 |
+| satvis | a sky view that follows the phone | 10 |
+| osiris, ARGOS ATLAS | more keyless road cameras; a count of live-video feeds to set beside ARGOS's 18,838 | 11 |
+| worldmonitor | which satellites image a place, and when | 12 |
+| gods-eye-view | Anime style | 13 |
+| keeptrack.space | renderer scale | measured in task 14 before it is claimed either way |
+| keeptrack.space | stereographic map | dropped: 2D mode with ground tracks and the polar plot already show what it shows |
+| keeptrack.space | Most Tracked | not planned: it ranks keeptrack's own usage, which no one else has |
+| spacetech-ssa | ML residual orbit model | not planned: training it needs precise ephemerides as truth, a data gap (12.4) |
+
+Left out on purpose, and staying out unless the owner overrules: ARGOS ATLAS's
+VIP jets and yachts (they track people), osiris's Shodan port scans (they probe
+hosts we do not own), and osiris's AI identification of vehicles on street
+cameras (following a vehicle across cameras is following its driver).
+
+### 12.4 What code cannot close
+
+Section 10.4 stands. Space-Track and TraCSS hold covariance for each object,
+analyst objects and operator ephemerides; LeoLabs, Slingshot and COMSPOC run
+their own sensors. This application estimates position error from the age of a
+TLE. Until one of those sources opens, "better than government and paid
+products" cannot be claimed for conjunction assessment, only for what a free,
+open, local tool can show.
+
+### 12.5 How this was checked
+
+| Check | Result |
+| --- | --- |
+| Test suite, 2026-11-20 | 2,925 passed, 1 skipped, 29 xfailed in 127 s |
+| Browser click audit, 2026-11-20 | 19 layers on, ten places, 59 kinds of object, 105 clicks, none unnamed (section 11) |
+| Rival activity | GitHub API: `pushed_at`, archive flag, and the compare count from each clone's read commit to the default branch |
+| Rival features | commit titles only; no code read this time |
+
+No independent reviewer was run on this verdict. Saying "not yet" does not need
+one; claiming "ahead of all" will, as section 9 did.
+
+### 12.6 The plan
+
+The working plan, with interfaces and tests for each task, is kept on this
+machine at `docs/superpowers/plans/2026-11-20-close-the-gaps.md` (`docs/superpowers/`
+is ignored by this repository). In order:
+
+0. Rescan the six active rivals: pull the clones, read the code behind each row of
+   12.1, amend 12.3 with what is really there.
+1. Live conjunctions: one catalog-wide screen per catalog refresh, pushed over a
+   new `/ws/conjunctions` socket with new, changed and cleared events.
+2. Conjunction heatmap on the globe, weighted by Pc, with a card under the cursor.
+3. CZML export of tracks and conjunctions for Cesium and STK users.
+4. Saved scenarios: the share link plus every module's settings, named, exported
+   and imported as a file.
+5. Relative motion: RIC tracks for the open conjunction, a Clohessy-Wiltshire
+   tradespace of avoidance burns, and a neighbours search for any object. Safety
+   reviewer before merge.
+6. Estimated front lines in the 13 theatres, drawn from towns held and labelled
+   as estimates.
+7. Camera viewshed: a pose per camera and the ground it can see, clipped by terrain.
+8. Phone: the PWA served by the live app, and the existing control sheet checked
+   at phone size, with what that check finds fixed.
+9. Pass notifications for watched satellites.
+10. A sky view that follows the phone's compass and tilt.
+11. More keyless road cameras, and a live-video count.
+12. Site watch: which imaging satellites pass over a place and whether it falls in
+    their swath.
+13. A cel-shaded style.
+14. Verification: the browser click audit moved into `scripts/`, a phone-sized
+    run, the full suite, the CARA harness, and this section rewritten with the
+    results.
+
+## 13. Against Google Earth and Google Maps (2026-11-20)
+
+The owner set the bar on 2026-11-20 with a Google Earth link: Kano, Nigeria, seen
+from 465 m at a 35 degree tilt, a photorealistic 3D city. The ask was to do all of
+what Google Earth and Google Maps do, at that quality, for no pay, and to build
+on it afterwards. This section is the parity list; the plan that closes it is
+`docs/superpowers/plans/2026-11-20-google-parity.md` (local), and it runs before
+the rival plan of 12.6.
+
+Does the application have all of it today? No. It has the globe, terrain, sub-metre
+imagery, search, measuring, KML and the rest of the drawing kit; it lacks the 3D
+city mesh in the owner's link, street-level imagery, directions, historical
+high-resolution imagery and most of Google Maps' place features.
+
+### 13.1 The quality in the link
+
+Google Earth's 3D cities are Google Photorealistic 3D Tiles. The page already
+loads them when `GOOGLE_MAPS_API_KEY` is set (`worldview.html` `checkConfig`), but
+a Google key needs a billing account, and Google's free allowance (1,000 root
+tile requests a month) has no hard cap. The same tiles reach Cesium through a
+Cesium ion Community account: free, no card, meant for personal non-commercial
+use, 1,000 scene loads of the Google tiles a month, limits Cesium describes as
+soft. That is the no-pay route to the quality in the link, and it needs one thing
+only the owner can do: sign up at cesium.com and set `CESIUM_ION_TOKEN`. Without
+it, the keyless fallback is OpenStreetMap buildings extruded from their mapped
+heights, which reads as a model of the city, not a photograph of it.
+
+### 13.2 Google Earth, feature by feature
+
+| Google Earth | Vantage now | Free way to close it | Task |
+| --- | --- | --- | --- |
+| Photorealistic 3D cities | only with a paid-tier Google key | Google tiles through a free Cesium ion token; OSM buildings keyless | G1 |
+| Satellite imagery | Esri World Imagery, NASA Blue Marble and Black Marble, keyless | | have |
+| Terrain | Esri elevation, keyless (`maptools.js`) | | have |
+| Search and fly to | Nominatim through the omnibox | | have |
+| Roads, borders and place labels over imagery | none over the imagery basemaps | Esri reference layers, keyless | G2 |
+| Historical imagery | NASA GIBS by day at 250 m to 1 km | Esri World Imagery Wayback, about 200 dated versions since 2014, keyless | G3 |
+| Timelapse | none | NASA GIBS Harmonized Landsat Sentinel-2 by year, keyless | G3 |
+| Detect change (experimental) | swipe between two NASA dates | the same swipe on Wayback, plus a pixel-difference overlay | G3 |
+| Elevation contours, slope | none | Cesium globe materials on the keyless terrain | G4 |
+| Street View | none | Panoramax (keyless) and Mapillary (free token, no card) | G5 |
+| Measure distance and area | yes, plus elevation profile and line of sight | building height on 3D tiles | G1 |
+| Projects, placemarks, KML | drawings, pins, bookmarks, KML, GeoJSON and GPX in and out | rich placemark text and a photo | G9 |
+| Voyager stories, present mode | tours and presentation mode | | have |
+| I'm Feeling Lucky | none | a random named place from the peak and Wikipedia sets | G8 |
+| Places, photos, knowledge cards | "what's here" card: address, elevation, weather, cameras, peaks, satellites overhead | Wikipedia geosearch and Wikimedia Commons, keyless | G8 |
+| Data layers: footprints, hydrants, storm drains, traffic lights | power, airports, ports, dams, data centres, cables | OpenStreetMap through Overpass for the view, keyless | G10 |
+| Animated clouds, gridlines | yes | | have |
+| Flight simulator (web since 2026) | none | a camera flight model with a HUD, no service needed | G11 |
+| Sky, Moon and Mars (Earth Pro) | sky view; no Moon or Mars globe | NASA Moon Trek and Mars Trek tiles, keyless | G12 |
+| Gemini in Earth | assistant with typed tools on a local model | | have |
+| AI image generation (experimental) | none | not planned: invented pictures of real places |  |
+| Land parcels | none | not planned: no free global source |  |
+
+### 13.3 Google Maps, feature by feature
+
+| Google Maps | Vantage now | Free way to close it | Task |
+| --- | --- | --- | --- |
+| Directions: drive, walk, cycle | none | OSRM and Valhalla public servers, keyless, light use | G6 |
+| Directions: transit | none | Transitous (MOTIS), keyless | G6 |
+| Explore nearby: food, fuel, hospitals, hotels | none | Overpass by category for the view | G7 |
+| Place card: hours, phone, website, access | address only | OpenStreetMap tags plus Wikidata | G7 |
+| Reviews and popular times | none | not planned: no free source exists |  |
+| Live traffic | an animation on major roads, not measured congestion | TomTom flow tiles with a free key (no card) | G13 |
+| Transit lines layer | none | OpenRailwayMap and public transport tiles, keyless | G13 |
+| Air quality layer | none | Open-Meteo air quality (CAMS), keyless | G13 |
+| Wildfires layer | NASA FIRMS (free key) | | have |
+| Street View | none | as G5 | G5 |
+| Saved lists | bookmarks, watchlist, camera favourites | scenarios (12.6 task 4) | have |
+| Offline maps | static build only | the live-app PWA (12.6 task 8) | plan 12.6 |
+| Ask Maps (Gemini) | the assistant, with place search as a tool | | have |
+| Timeline, location sharing | none | not planned: it records where a person goes |  |
+| Immersive Navigation | none | not planned for a desktop globe; the route over 3D tiles comes with G1 and G6 |  |
+
+What only this application has against both: the whole orbital side (catalog,
+conjunctions with Pc checked against NASA CARA, passes, the sky view, aurora),
+live aircraft and ships, conflict and country intelligence, 193,190 public
+cameras, 12.2 million summits with forecasts, and an assistant that runs on a
+local model. Google Earth draws none of it.
