@@ -24,6 +24,7 @@ import numpy as np
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 
+from sda import spaceweather
 from sda.constants import EARTH_MU_KM3_S2, EARTH_RADIUS_KM
 from sda.dashboard import DASHBOARD_HTML
 from sda.models import ConjunctionRequest, TLERecord
@@ -848,7 +849,7 @@ async def proxy_traffic(
     )
     url = "https://overpass-api.de/api/interpreter?data=" + quote(overpass_query)
     # Overpass rejects generic library User-Agents with HTTP 406
-    headers = {"User-Agent": "sda-collision-predictor/0.2 (worldview traffic layer)"}
+    headers = {"User-Agent": "vantage/0.2 (worldview traffic layer)"}
 
     try:
         async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
@@ -1020,7 +1021,7 @@ async def proxy_geocode(
         "https://nominatim.openstreetmap.org/search"
         "?format=jsonv2&limit=8&q=" + quote(q)
     )
-    headers = {"User-Agent": "sda-collision-predictor/0.2 (worldview geocoder)"}
+    headers = {"User-Agent": "vantage/0.2 (worldview geocoder)"}
 
     try:
         async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
@@ -1044,6 +1045,61 @@ async def proxy_geocode(
             continue
 
     return {"results": results, "count": len(results)}
+
+
+#: Reverse geocoding: Nominatim asks for at most one request a second and a
+#: real User-Agent, so calls are serialised with a gap and answers are cached.
+_REVERSE_GAP_S = 1.1
+_REVERSE_TTL_S = 24 * 3600.0
+_REVERSE_CACHE_MAX = 2048
+_reverse_cache: dict[tuple[float, float, int], tuple[float, str]] = {}
+_reverse_lock = asyncio.Lock()
+_reverse_last = 0.0
+
+
+@router.get(
+    "/api/geocode/reverse",
+    tags=["WorldView"],
+    summary="Place name for a point via OpenStreetMap Nominatim",
+)
+async def proxy_reverse_geocode(
+    lat: float = Query(..., ge=-90.0, le=90.0, description="Latitude, degrees"),
+    lon: float = Query(..., ge=-180.0, le=180.0, description="Longitude, degrees"),
+    zoom: int = Query(14, ge=3, le=18, description="Nominatim detail level"),
+):
+    """The place name for a right-clicked point on the globe (map tools popup)."""
+    global _reverse_last
+    key = (round(lat, 4), round(lon, 4), zoom)
+    hit = _reverse_cache.get(key)
+    if hit is not None and time.monotonic() - hit[0] < _REVERSE_TTL_S:
+        return {"display_name": hit[1], "cached": True}
+    url = (
+        "https://nominatim.openstreetmap.org/reverse?format=jsonv2"
+        f"&lat={lat:.6f}&lon={lon:.6f}&zoom={zoom}"
+    )
+    headers = {"User-Agent": "vantage/0.2 (worldview reverse geocoder)"}
+    async with _reverse_lock:
+        wait = _REVERSE_GAP_S - (time.monotonic() - _reverse_last)
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _reverse_last = time.monotonic()
+        try:
+            async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
+                resp = await client.get(url)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail="Nominatim request failed") from exc
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Nominatim unavailable")
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="Nominatim sent no JSON") from exc
+    name = data.get("display_name", "") if isinstance(data, dict) else ""
+    name = name if isinstance(name, str) else ""
+    if len(_reverse_cache) >= _REVERSE_CACHE_MAX:
+        _reverse_cache.pop(next(iter(_reverse_cache)))
+    _reverse_cache[key] = (time.monotonic(), name)
+    return {"display_name": name, "cached": False}
 
 
 # ---------------------------------------------------------------------------
@@ -1372,7 +1428,7 @@ def _as_int(value: object) -> int:
 def _browser_headers(purpose: str) -> dict[str, str]:
     """User-Agent several of these public APIs require of automated clients."""
     return {
-        "User-Agent": f"sda-collision-predictor/0.2 (worldview {purpose})",
+        "User-Agent": f"vantage/0.2 (worldview {purpose})",
         "Accept": "application/json",
     }
 
@@ -1495,16 +1551,10 @@ SPACE_WEATHER_CACHE_TTL_S = 300.0
 
 #: Kp -> NOAA G-scale label. Kp is a quasi-logarithmic 0-9 index; the G scale
 #: starts at Kp 5 (G1) and each further step is one more storm level.
-_G_SCALE = ((9.0, "G5"), (8.0, "G4"), (7.0, "G3"), (6.0, "G2"), (5.0, "G1"))
-
-
 def _g_scale(kp: float | None) -> str:
-    if kp is None:
-        return ""
-    for threshold, label in _G_SCALE:
-        if kp >= threshold:
-            return label
-    return "G0"
+    """NOAA G level for the newest Kp, from the same table as the space weather
+    panel (Kp comes in thirds and 5-, 4.67, is already G1); "" with no reading."""
+    return spaceweather.g_label(spaceweather.g_from_kp(kp)) or ""
 
 
 def _swpc_records(data: object) -> list[dict]:
@@ -2114,7 +2164,7 @@ async def proxy_military_sites(
         f");out center {_MILITARY_MAX_FEATURES};"
     )
     url = "https://overpass-api.de/api/interpreter?data=" + quote(overpass_query)
-    headers = {"User-Agent": "sda-collision-predictor/0.2 (worldview military sites)"}
+    headers = {"User-Agent": "vantage/0.2 (worldview military sites)"}
 
     try:
         async with httpx.AsyncClient(timeout=25.0, headers=headers) as client:

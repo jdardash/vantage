@@ -22,6 +22,7 @@ def health():
         _last_tle_refresh,
         _live_f107,
         _metrics,
+        catalog_source,
         store,
     )
 
@@ -35,6 +36,9 @@ def health():
             "last_tle_refresh": _last_tle_refresh.isoformat() if _last_tle_refresh else None,
             "celestrak_groups": len(CELESTRAK_GROUPS),
             "auto_refresh_hours": round(TLE_REFRESH_INTERVAL_S / 3600.0, 2),
+            # Where the elements came from: CelesTrak, a fallback, the cache or
+            # the bundled demo set, with a count of held sets per source.
+            "catalog_source": catalog_source(),
         },
         "version": __version__,
         "timestamp": datetime.now(UTC).isoformat(),

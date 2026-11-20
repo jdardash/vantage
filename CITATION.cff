@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
-title: "Space-Domain Awareness Collision Predictor"
-abstract: "Satellite conjunction analysis engine with SGP4 propagation, collision probability computation, and interactive 3D visualization."
+title: "Vantage: open space-domain awareness and world view"
+abstract: "Open-source space-domain awareness on a live 3D globe: full-catalog SGP4 propagation, conjunction screening with four collision-probability methods checked against NASA CARA, CCSDS CDM exchange, space weather, aurora, a sky view, public cameras and world peaks with summit conditions."
 authors:
   - family-names: Dardash
     given-names: J.
@@ -10,7 +10,7 @@ authors:
 version: 0.3.0
 date-released: "2026-07-31"
 license: MIT
-repository-code: "https://github.com/jdardash/space-collision-predictor"
+repository-code: "https://github.com/jdardash/vantage"
 keywords:
   - satellite
   - conjunction

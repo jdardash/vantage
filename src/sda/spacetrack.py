@@ -274,6 +274,19 @@ class SpaceTrackClient:
         resp = self._query(predicate)
         return _as_rows(resp)
 
+    def satcat(self) -> list[dict[str, Any]]:
+        """The current SATCAT row of every object (about 65,000 rows).
+
+        Space-Track asks for at most one satcat query a day, after 1700 UTC; the
+        caller (sda.satcat) caches the reply for a day and uses it only when
+        Spacebook has failed and no cached copy exists.
+        """
+        predicate = "/".join(
+            ["class/satcat", "CURRENT/Y", "orderby/NORAD_CAT_ID%20asc", "format/json"]
+        )
+        resp = self._query(predicate)
+        return _as_rows(resp)
+
     def cdm_public(self, limit: int = DEFAULT_CDM_LIMIT) -> list[dict[str, Any]]:
         """Publicly released conjunction data messages, soonest TCA first.
 

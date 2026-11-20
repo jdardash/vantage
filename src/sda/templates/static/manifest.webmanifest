@@ -1,7 +1,7 @@
 {
   "id": "sda-worldview-demo",
-  "name": "SDA WorldView Collision Predictor",
-  "short_name": "WorldView",
+  "name": "Vantage: space-domain awareness globe",
+  "short_name": "Vantage",
   "description": "Offline space-domain awareness globe: SGP4 propagation, conjunction screening and collision probability, running entirely in the browser.",
   "start_url": "../",
   "scope": "../",

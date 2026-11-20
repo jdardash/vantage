@@ -476,5 +476,21 @@ def test_modules_get_the_hooks_and_the_mounts(page):
     for hook in ("simNow: simNow", "refreshSatVisibility: refreshSatVisibility",
                  "getConjunction:", "getConjunctions:"):
         assert hook in init, hook
-    for mount in ("ext-categories", "ext-isscam", "ext-conjactions"):
+    for mount in ("ext-categories", "ext-isscam", "ext-conjactions", "ext-cameras",
+                  "ext-skyview", "ext-aurora", "ext-nasaimagery", "ext-summit", "ext-dossier",
+                  "ext-spaceweather", "ext-weather", "ext-maptools", "ext-peaks"):
         assert page.count(f'<div id="{mount}"></div>') == 1, mount
+
+
+def test_panel_mounts_sit_in_the_sidebar(page):
+    """A module panel mounted outside the controls sidebar is hidden or stranded:
+    on 2026-11-19 four mounts were found inside the conjunction drawer, which is
+    shown only with an open event. ext-conjactions belongs in that drawer."""
+    import re
+
+    start = page.index('<aside id="controls"')
+    end = page.index("</aside>", start)
+    outside = [m.group(1) for m in re.finditer(r'<div id="(ext-[a-z0-9]+)"></div>', page)
+               if not start < m.start() < end and m.group(1) != "ext-conjactions"]
+    assert outside == []
+

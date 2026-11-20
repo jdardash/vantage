@@ -484,3 +484,94 @@ an error on every refresh) and is gone from the globe's catalog menu. What is
 open: an OMM path through the store, the worker, `rv2tle`, CDM output and the
 alpha-5 search. It changes the rule that all ingestion goes through
 `TLEStore.load_from_text`, so it waits for a decision.
+
+## 10. Against NASA, government and paid SDA products (2026-11-19)
+
+The question this time came from the owner: compare with NASA and keep working
+until the application is better than the best sites, government and Palantir
+included. Section 9 compared open-source maps; this one compares products.
+
+Method. Twenty-one products were read from their public pages and, where they
+answer without an account, probed live (`reference/notes/gap-nasa-gov-palantir.md`,
+section 1, with every source). Paid and closed products (LeoLabs, Slingshot,
+COMSPOC's paid tier, STK, Palantir) are judged only from their own published
+material; Palantir has no public SDA product to open, so nothing about it here
+was run. The note ranked twelve gaps by harm avoided for an operator first, and
+they were worked in that order alongside the map items asked for in the same
+session.
+
+### 10.1 The twelve gaps, item by item
+
+| # | Gap | Status | Where |
+| --- | --- | --- | --- |
+| 1 | A second keyless catalog source, six-digit objects | done: OMM reader with alpha-5 ids; SatNOGS DB and COMSPOC Spacebook asked in turn when CelesTrak delivers nothing for two hours; `/health` names the source of every held set | `omm.py`, `tle_store.py`, `api.py` |
+| 2 | Object-specific covariance for screening Pc | open | |
+| 3 | Object dossier and per-object hard-body radius | dossier done (owner, launch, type, RCS, mass and span from Spacebook SATCAT and GCAT, with COMSPOC's 5 kg, 10 m no-data placeholder never shown as a size); HBR into Pc open, the dossier is metadata only and never feeds Pc or risk | `satcat.py`, `routes/satcat.py`, `static/js/dossier.js` |
+| 4 | Operational screening volumes scored against the TraCSS answer key | open; the coarse-screen recall work in section 10.4 is the first half | |
+| 5 | Operator ephemeris screening | open | |
+| 6 | Storm-aware drag and prediction confidence | done: SWPC 45-day Ap and F10.7 integrated from the element epoch, storm term an upper bound, storm check on low-perigee conjunctions; passed the safety reviewer on its third round | `decay.py`, `spaceweather.py`, `routes/space.py` |
+| 7 | Fragmentation detection with a measured Gabbard diagram | open (the breakup model and its Gabbard preview predate this pass) | |
+| 8 | Reentry board on the globe | open on the globe; `/reentries` reads Space-Track TIP when credentials are set | `routes/ops.py` |
+| 9 | Behaviour baselines and alerts | open | |
+| 10 | Investigation timeline and case file | open | |
+| 11 | Dated NASA imagery and natural events with swipe compare | done: GIBS MODIS Terra, Aqua, VIIRS NOAA-20 true colour and the Day/Night Band for any day on the clock, two-date swipe, EONET events | `static/js/nasaimagery.js`, `routes/eonet.py` |
+| 12 | The rest of CARA (3D Pc, Nc, SDMC, Elrod) | open | |
+
+### 10.2 Map items added in the same pass
+
+| Item | What it is | Where |
+| --- | --- | --- |
+| Weather | RainViewer radar (13 frames), an Open-Meteo 10 m wind field animated as particles (2,232 points in four paced passes, at most twice a day), NHC and GDACS cyclones with track and cone | `routes/weather.py`, `static/js/weather.js` |
+| Map tools | distance, area, pins, range rings, elevation profile and line of sight on keyless Esri terrain, MGRS, UTM and plus codes, GeoJSON, KML and GPX in and out, bookmarks, graticule, terminator with twilight bands, reverse geocoding | `static/js/maptools.js`, `routes/worldview.py` |
+| Aurora and space weather | OVATION oval, Kp, G/S/R scales and the 45-day outlook | `static/js/aurora.js`, `static/js/spaceweather.js` |
+| Sky view | 2,851 stars, constellation lines, planets and every satellite above the horizon from any point | `static/js/skyview.js` |
+| Public cameras | 193,190 cameras in 176 countries, private-device sources excluded at import | `cameras.py`, `static/js/cameras.js` |
+| World peaks with conditions | 12,226,094 summits (11,866,713 with prominence), summit forecast scored GO / MARG / NO on click | `peaks.py`, `summit.py`, `static/js/peaks.js` |
+
+### 10.3 Evidence
+
+Run on 2026-11-19 against the tree that was committed (the screening recall work
+of section 10.4 held back), in a clean worktree, except the live rows, which come
+from the launcher's server on port 8010.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Test suite | `pytest tests/ -q` | 2424 passed, 1 skipped, 29 xfailed in 1,176 s (machine under memory pressure) |
+| Lint and types | `ruff check src/ tests/`, `mypy src/sda` | both clean (58 source files) |
+| CARA reference harness | `python -m sda.cara` | 53/53 Foster cases inside CARA's tolerance bands, 11/11 Alfano literals matched |
+| Cross-method Pc validation | `python -m sda.validation` | all checks passed |
+| API surface | `python scripts/gen_api_table.py --write` | 100 REST operations + 1 WebSocket, up from 73 in section 9 |
+| Live catalog | `GET /health` | 32,887 objects; CelesTrak had delivered nothing for two hours, so 32,119 element sets came from Spacebook and 757 from SatNOGS DB, which is gap 1 doing its job |
+| Live peaks | `GET /api/peaks/summary` | 12,226,094 summits, 980,452 named, 243 countries |
+| Live cameras | `GET /api/cameras/summary` | 193,190 cameras, 167,883 playable in the browser |
+
+### 10.4 Verdict
+
+Against free public sites the claim holds. No free web application found
+computes Pc four ways with coded usage checks and reproduces NASA CARA's own
+cases (CARA's own toolkit does the math, as a library rather than a site),
+and none puts that beside live weather, map tools, every summit on Earth with a forecast, the
+sky from any point, public cameras and dated NASA imagery on one globe.
+Worldview still carries more imagery: over a thousand GIBS layers against the
+four true-colour and night products used here, which suits a conjunction tool
+but is a real difference.
+
+Against government and paid products it does not hold, and code alone will not
+make it hold. Space-Track and TraCSS hold the full catalog with analyst objects,
+covariance for each object and operator ephemerides; LeoLabs, Slingshot and
+COMSPOC run their own sensors. This application estimates position error from
+the age of a TLE. The three gaps that matter most to an operator, object
+covariance (2), screening volumes scored against TraCSS (4) and operator
+ephemeris screening (5), are all data gaps first. Palantir has no public SDA
+product; its published strength is fusing many sources into a case file, which
+is gaps 9 and 10 here, and nothing about it was run.
+
+Gap 4 has a first half in progress and held out of this commit: a rewrite of the
+coarse screen so that no close approach can fall between two samples. The
+safety reviewer passed the first two rounds' fixes and returned REVISE on the
+third, on decayed SGP4 states whose reported speed understates how fast the
+position moves. It goes in only on a PASS.
+
+Next, in order: gap 4's screening volumes once the recall work passes, then
+gap 2 through CDM covariances already ingested (`cdm.py`), then gap 8's reentry
+board on the globe, which needs nothing new from upstream.

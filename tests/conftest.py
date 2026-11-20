@@ -103,3 +103,22 @@ def _no_real_tle_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     """Several tests run the real app lifespan, which loads SDA_TLE_CACHE_DIR
     when it is set. A developer's cache must never leak into a test catalog."""
     monkeypatch.delenv("SDA_TLE_CACHE_DIR", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_satcat_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The app lifespan loads the SATCAT cache from SDA_SATCAT_DIR (default the user
+    cache dir). Tests read an empty scratch directory instead of a developer's copy."""
+    monkeypatch.setenv("SDA_SATCAT_DIR", str(tmp_path_factory.getbasetemp() / "satcat-empty"))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_peak_catalog(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The peaks routes open peaks.sqlite under SDA_PEAK_DIR (default the user cache
+    dir, 1.2 GB once imported). Tests see an empty scratch directory unless a test
+    points the variable somewhere itself."""
+    monkeypatch.setenv("SDA_PEAK_DIR", str(tmp_path_factory.getbasetemp() / "peaks-empty"))

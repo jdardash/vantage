@@ -93,6 +93,17 @@ def test_static_asset_tree_is_copied_next_to_index(tmp_path: Path):
         "static/js/isscam.js",
         "static/js/categories.js",
         "static/js/conjactions.js",
+        "static/js/cameras.js",
+        "static/js/skyview.js",
+        "static/js/aurora.js",
+        "static/js/nasaimagery.js",
+        "static/js/summit.js",
+        "static/js/dossier.js",
+        "static/js/spaceweather.js",
+        "static/js/weather.js",
+        "static/js/maptools.js",
+        "static/js/peaks.js",
+        "static/data/sky.json",
         "static/manifest.webmanifest",
         "static/icon.svg",
         "static/icon-maskable.svg",
@@ -150,6 +161,17 @@ def test_baked_assets_stay_ascii(tmp_path: Path):
         "static/js/isscam.js",
         "static/js/categories.js",
         "static/js/conjactions.js",
+        "static/js/cameras.js",
+        "static/js/skyview.js",
+        "static/js/aurora.js",
+        "static/js/nasaimagery.js",
+        "static/js/summit.js",
+        "static/js/dossier.js",
+        "static/js/spaceweather.js",
+        "static/js/weather.js",
+        "static/js/maptools.js",
+        "static/js/peaks.js",
+        "static/data/sky.json",
     ):
         text = (tmp_path / relative).read_text(encoding="utf-8")
         offenders = sorted({ch for ch in text if ord(ch) > 126})
@@ -178,6 +200,8 @@ def test_style_and_tactical_bundles_are_loaded_by_the_page(tmp_path: Path):
 # In page order. A module joins this list when its script tag joins the page.
 PANEL_MODULES = (
     "satsearch", "layers", "passpanel", "agentpanel", "isscam", "categories", "conjactions",
+    "cameras", "skyview", "aurora", "nasaimagery", "summit", "dossier", "spaceweather",
+    "weather", "maptools", "peaks",
 )
 
 

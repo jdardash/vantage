@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import numpy as np
 from fastapi import APIRouter, HTTPException, Query
 
+from sda import spaceweather
 from sda.conjunction import classify_risk
 from sda.decay import estimate_decay
 from sda.maneuver import plan_maneuver
@@ -138,11 +141,22 @@ def _make_histogram(values: list[float], n_bins: int = 30) -> list[dict]:
     summary="Orbital decay and lifetime estimate",
     response_description="Estimated remaining lifetime, decay rate, and reentry risk",
 )
-def get_decay_estimate(
+async def get_decay_estimate(
     norad_id: int,
     f107: float | None = Query(
         default=None,
+        allow_inf_nan=False,
         description="F10.7 solar flux index (SFU). Omit to use live NOAA data.",
+    ),
+    forecast: bool = Query(
+        default=False,
+        description=(
+            "Integrate NOAA SWPC's 45-day daily F10.7 and Ap forecast day by day "
+            "(cached 15 min) from the TLE epoch day, Ap raising density in storms; "
+            "the lifetime is counted from today. f107 then only covers the days "
+            "before the forecast starts. Falls back to the single value, and says "
+            "so in forecast_source, when the forecast is unavailable."
+        ),
     ),
 ):
     """Estimate orbital decay rate and remaining lifetime for a satellite."""
@@ -153,8 +167,56 @@ def get_decay_estimate(
         raise HTTPException(status_code=404, detail="Satellite not found")
 
     effective_f107 = f107 if f107 is not None else _live_f107
-    result = estimate_decay(tle, f107_solar_flux=effective_f107)
+    forecast_source: dict | None = None
+    days: tuple[spaceweather.ForecastDay, ...] | None = None
+    f107_mean: float | None = None
+    if forecast:
+        sw = await spaceweather.current()
+        days = sw.forecast.days if sw.forecast else None
+        f107_mean = sw.f107.ninety_day_mean if sw.f107 and days else None
+        forecast_source = {
+            "used": False,
+            "source": spaceweather.FORECAST_SOURCE,
+            "url": spaceweather.FORECAST_45_DAY_URL,
+            "issued": sw.forecast.issued if sw.forecast else None,
+            "stale": "forecast" in sw.stale,
+            "f107_mean": f107_mean,
+            "f107_mean_source": "SWPC observed 90-day mean F10.7" if f107_mean else None,
+        }
+        if days is None:
+            forecast_source["error"] = "SWPC 45-day forecast unavailable; single F10.7 value used"
+    if days is not None:
+        result = estimate_decay(
+            tle,
+            f107_solar_flux=effective_f107,
+            forecast=days,
+            f107_mean=f107_mean,
+            start=datetime.now(UTC),
+        )
+        if forecast_source is not None:
+            use = result.space_weather_forecast
+            forecast_source["used"] = use is not None and use.days_used > 0
+            if use is not None and use.reentry_before_counted_from:
+                forecast_source["error"] = (
+                    "These elements predict reentry before now"
+                    + ("" if forecast_source["used"] else ", before any forecast day")
+                    + "; refresh the TLE"
+                )
+            elif use is not None and use.reentry_before_forecast:
+                forecast_source["error"] = (
+                    "Reentry falls before the first SWPC forecast day, so the forecast "
+                    "was not reached; solar_activity_note gives the F10.7 used"
+                )
+            elif not forecast_source["used"]:
+                forecast_source["error"] = (
+                    "SWPC forecast covers no day of this estimate; "
+                    "solar_activity_note gives the F10.7 used"
+                )
+    else:
+        result = estimate_decay(tle, f107_solar_flux=effective_f107)
     out = result.model_dump(mode="json")
     out["f107_source"] = "user" if f107 is not None else "live_noaa"
     out["f107_value"] = effective_f107
+    if forecast_source is not None:
+        out["forecast_source"] = forecast_source
     return out

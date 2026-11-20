@@ -418,6 +418,50 @@ def test_geocode_network_failure(monkeypatch):
     assert "error" in data
 
 
+# --- /api/geocode/reverse ---
+
+
+@pytest.fixture
+def reverse_fresh(monkeypatch):
+    """An empty cache and no wait: the 1.1 s Nominatim gap is not under test here."""
+    monkeypatch.setattr(wv, "_reverse_cache", {})
+    monkeypatch.setattr(wv, "_REVERSE_GAP_S", 0.0)
+
+
+def test_reverse_geocode_names_the_point_and_caches(monkeypatch, reverse_fresh):
+    calls = []
+
+    def answer(url):
+        calls.append(url)
+        return FakeResponse(200, {"display_name": "Zermatt, Visp, Valais, Switzerland"})
+
+    patch_get(monkeypatch, answer)
+    first = client.get("/api/geocode/reverse?lat=46.0207&lon=7.7491").json()
+    again = client.get("/api/geocode/reverse?lat=46.02071&lon=7.74912").json()
+    assert first == {"display_name": "Zermatt, Visp, Valais, Switzerland", "cached": False}
+    assert again["cached"] is True and again["display_name"] == first["display_name"]
+    assert len(calls) == 1
+    assert "lat=46.020700" in calls[0] and "zoom=14" in calls[0]
+
+
+def test_reverse_geocode_refuses_bad_points():
+    assert client.get("/api/geocode/reverse?lat=91&lon=0").status_code == 422
+    assert client.get("/api/geocode/reverse?lat=0&lon=-181").status_code == 422
+
+
+def test_reverse_geocode_upstream_failure_is_502(monkeypatch, reverse_fresh):
+    patch_get(monkeypatch, _raise)
+    assert client.get("/api/geocode/reverse?lat=1&lon=2").status_code == 502
+    patch_get(monkeypatch, lambda url: FakeResponse(503, {}))
+    assert client.get("/api/geocode/reverse?lat=1&lon=2").status_code == 502
+
+
+def test_reverse_geocode_ocean_has_no_name(monkeypatch, reverse_fresh):
+    patch_get(monkeypatch, lambda url: FakeResponse(200, {"error": "Unable to geocode"}))
+    data = client.get("/api/geocode/reverse?lat=0&lon=-140").json()
+    assert data["display_name"] == ""
+
+
 # --- /worldview page: basemap choice ---
 
 
@@ -1018,3 +1062,14 @@ def test_space_weather_reports_unavailable_when_everything_fails(monkeypatch, fr
     # A total outage is not cached: the next request tries again.
     patch_get(monkeypatch, swpc_router(SWPC_KP_NOW, SWPC_WIND_NOW, SWPC_ALERTS))
     assert client.get("/api/space-weather").json()["kp"] == 1.67
+
+
+def test_globe_storm_level_counts_kp_five_minus_as_g1():
+    # Kp is published in thirds and NOAA's G1 band includes 5- (4.67); the globe
+    # strip used to start G1 at 5.0, so a 5- reading showed G0 beside a panel
+    # that said G1.
+    from sda.routes.worldview import _g_scale
+
+    assert [_g_scale(k) for k in (None, 4.33, 4.67, 5.0, 5.67, 7.67, 8.67, 9.0)] == [
+        "", "G0", "G1", "G1", "G2", "G4", "G4", "G5",
+    ]

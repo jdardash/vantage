@@ -1,4 +1,4 @@
-# Deploying the collision predictor
+# Deploying Vantage
 
 Manifests for a plain Kubernetes cluster, plus the environment contract shared with
 `docker-compose.yml` and the `Dockerfile`. Nothing here is cluster specific beyond the image

@@ -306,6 +306,53 @@ def test_selected_norad_id_reads_the_engine():
 # ---------------------------------------------------------------------------
 
 
+def test_build_pass_request_asks_for_samples_only_when_told():
+    body = js("P.buildPassRequest(25544, D, {includeSamples: true})", OBSERVER)
+    assert body == {"observer": OBSERVER, "norad_id": 25544, "include_samples": True}
+
+
+def test_polar_point_puts_zenith_in_the_centre_and_north_on_top():
+    assert js("P.polarPoint(0, 90, 56)") == {"x": 56, "y": 56}
+    assert js("P.polarPoint(0, 0, 56)") == {"x": 56, "y": 0}
+    assert js("P.polarPoint(90, 0, 56)") == {"x": 112, "y": 56}
+    assert js("P.polarPoint(180, 0, 56)") == {"x": 56, "y": 112}
+    assert js("P.polarPoint(270, 0, 56)") == {"x": 0, "y": 56}
+    half = js("P.polarPoint(45, 45, 56)")
+    assert abs(half["x"] - (56 + 28 * 0.70711)) < 0.02
+    assert abs(half["y"] - (56 - 28 * 0.70711)) < 0.02
+
+
+def test_polar_point_refuses_below_horizon_and_junk():
+    for args in ("10, -0.5, 56", "NaN, 10, 56", "'a', 10, 56", "10, Infinity, 56", "10, null, 56"):
+        assert js(f"P.polarPoint({args})") is None
+
+
+def test_polar_track_and_path_skip_bad_samples():
+    samples = [
+        {"azimuth_deg": 232, "elevation_deg": -1},
+        {"azimuth_deg": 232, "elevation_deg": 10},
+        None,
+        {"azimuth_deg": 151, "elevation_deg": 60.5},
+        {"azimuth_deg": 71, "elevation_deg": 10},
+    ]
+    track = js("P.polarTrack(D, 56)", samples)
+    assert len(track) == 3
+    path = js("P.polarPath(P.polarTrack(D, 56))", samples)
+    assert path.startswith("M") and path.count("L") == 2
+    assert js("P.polarPath([])") == "" and js("P.polarPath(null)") == ""
+    assert js("P.polarTrack(null, 56)") == []
+
+
+def test_pass_rows_carry_the_polar_track():
+    response = {"passes": [dict(PASSES_RESPONSE["passes"][0], samples=[
+        {"azimuth_deg": 232, "elevation_deg": 10},
+        {"azimuth_deg": 151, "elevation_deg": 60.5},
+    ])]}
+    rows = js("P.passRows(D, {timeZone: 'UTC'})", response)
+    assert len(rows[0]["track"]) == 2
+    assert js("P.passRows(D, {timeZone: 'UTC'})", PASSES_RESPONSE)[0]["track"] == []
+
+
 def test_pass_rows_from_a_real_response_in_utc():
     rows = js("P.passRows(D, {timeZone: 'UTC'})", PASSES_RESPONSE)
     assert len(rows) == 2
@@ -833,7 +880,9 @@ def test_passes_flow_calls_the_server_and_lists_local_times():
     by_url = {call["url"]: call for call in out["calls"]}
     assert by_url["/base/passes"]["method"] == "POST"
     assert by_url["/base/passes"]["contentType"] == "application/json"
-    assert by_url["/base/passes"]["body"] == {"observer": OBSERVER, "norad_id": 25544}
+    assert by_url["/base/passes"]["body"] == {
+        "observer": OBSERVER, "norad_id": 25544, "include_samples": True,
+    }
     assert by_url["/base/lookangles"]["body"] == {"observer": OBSERVER, "norad_ids": [25544]}
 
     text = out["text"]
@@ -849,6 +898,37 @@ def test_passes_flow_calls_the_server_and_lists_local_times():
     assert "ISS (ZARYA)" in out["intel"][0]
     assert len(out["live"]) == 1
     assert out["live"][0]["position"] == {"lon": 11.58, "lat": 48.15, "h": 520}
+
+
+def test_each_pass_gets_a_polar_chart_when_svg_is_available():
+    with_samples = {"passes": [dict(PASSES_RESPONSE["passes"][0], samples=[
+        {"azimuth_deg": 232, "elevation_deg": 10},
+        {"azimuth_deg": 151, "elevation_deg": 60.5},
+        {"azimuth_deg": 71, "elevation_deg": 10},
+    ])]}
+    out = panel(
+        """
+        global.document.createElementNS = function (ns, tag) {
+          var e = new El(tag); e.ns = ns; return e;
+        };
+        var ctx = makeCtx();
+        P.init(ctx);
+        fill(ctx, '48.15', '11.58', '520');
+        await runPasses(ctx);
+        var svgs = findAll(ctx.mount, function (e) { return e.tagName === 'SVG'; });
+        var paths = findAll(ctx.mount, function (e) { return e.tagName === 'PATH'; });
+        return {
+          svgs: svgs.length, ns: svgs.length ? svgs[0].ns : null,
+          d: paths.length ? paths[0].attrs.d : null,
+          text: ctx.mount.textContent
+        };
+        """,
+        {"responses": {**OK_RESPONSES, "/passes": {"status": 200, "body": with_samples}}},
+    )
+    assert out["svgs"] == 1
+    assert out["ns"] == "http://www.w3.org/2000/svg"
+    assert out["d"].startswith("M") and out["d"].count("L") == 2
+    assert "N" in out["text"] and "W" in out["text"]
 
 
 def test_no_selection_says_so_and_sends_nothing():
